@@ -1,7 +1,7 @@
 {
   "name": "achievement-hunter",
   "productName": "Achievement Hunter",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Find the Steam achievements you are missing and learn how to unlock them, step by step. No Steam sign-in.",
   "author": "YoungRedfox",
   "license": "GPL-3.0-only",
