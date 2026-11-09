@@ -10,16 +10,30 @@ import { Icon, Mark } from './components/ui';
 import { LangContext, errorKey, makeT } from './i18n';
 import { api } from './lib';
 
-type Route = { name: 'library' } | { name: 'game'; appid: number } | { name: 'settings' };
+type Route =
+  | { name: 'library' }
+  | { name: 'game'; appid: number }
+  | { name: 'xbox'; titleId: string }
+  | { name: 'settings'; section?: string };
 
 function parseHash(h: string): Route {
   const m = h.match(/^#\/game\/(\d+)/);
   if (m) return { name: 'game', appid: Number(m[1]) };
+  const x = h.match(/^#\/xbox\/(\d+)/);
+  if (x) return { name: 'xbox', titleId: x[1] };
+  if (h.startsWith('#/settings/xbox')) return { name: 'settings', section: 'xbox' };
   if (h.startsWith('#/settings')) return { name: 'settings' };
   return { name: 'library' };
 }
 const go = (r: Route) => {
-  location.hash = r.name === 'game' ? `#/game/${r.appid}` : r.name === 'settings' ? '#/settings' : '#/';
+  location.hash =
+    r.name === 'game'
+      ? `#/game/${r.appid}`
+      : r.name === 'xbox'
+        ? `#/xbox/${r.titleId}`
+        : r.name === 'settings'
+          ? `#/settings${r.section ? `/${r.section}` : ''}`
+          : '#/';
 };
 
 export function App() {
@@ -193,6 +207,12 @@ export function App() {
           <div className="drag-strip" />
           {route.name === 'settings' ? (
             <SettingsView
+              section={route.section}
+              onXboxChange={async () => {
+                const r = await api.getSettings();
+                if (r.ok) setSettings(r.data);
+                void loadLibrary(true);
+              }}
               settings={settings}
               onChange={(s) => {
                 const langChanged = s.lang !== settings.lang;
@@ -205,11 +225,25 @@ export function App() {
                 go({ name: 'library' });
               }}
             />
+          ) : route.name === 'xbox' ? (
+            (() => {
+              const g = lib?.games.find((x) => x.titleId === route.titleId);
+              return (
+                <GameView
+                  key={route.titleId}
+                  appid={0}
+                  xbox={{ titleId: route.titleId, image: g?.image }}
+                  game={g}
+                  onBack={() => history.back()}
+                  onSettings={() => go({ name: 'settings' })}
+                />
+              );
+            })()
           ) : route.name === 'game' ? (
             <GameView
               key={route.appid}
               appid={route.appid}
-              game={lib?.games.find((g) => g.appid === route.appid)}
+              game={lib?.games.find((g) => g.platform === 'steam' && g.appid === route.appid)}
               onBack={() => history.back()}
               onSettings={() => go({ name: 'settings' })}
             />
@@ -228,7 +262,9 @@ export function App() {
               filter={filter}
               setFilter={setFilter}
               onRefresh={() => loadLibrary(true)}
-              onOpen={(appid) => go({ name: 'game', appid })}
+              xboxConnected={!!settings.xbox}
+              onConnectXbox={() => go({ name: 'settings', section: 'xbox' })}
+              onOpen={(g) => (g.platform === 'xbox' && g.titleId ? go({ name: 'xbox', titleId: g.titleId }) : go({ name: 'game', appid: g.appid }))}
             />
           ) : (
             <div className="page">

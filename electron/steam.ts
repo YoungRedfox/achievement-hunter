@@ -104,6 +104,35 @@ export async function proxyGuide(appid: number, apiname: string, lang: Lang): Pr
   throw new AppError('AI_ERROR', body?.error ?? `HTTP ${res.status}`);
 }
 
+/** Poradnik dla gier spoza Steam: serwer dostaje nazwy z aplikacji, a klucz pamięci liczy z całej treści. */
+export async function proxyGuideText(
+  platform: 'xbox',
+  id: string,
+  input: { gameName: string; name: string; description: string; percent: number | null; lang: Lang },
+): Promise<Guide> {
+  const proxy = proxyUrl();
+  if (!proxy) throw new AppError('NO_AI_KEY');
+  const url = new URL(`${proxy}/guide-text`);
+  url.searchParams.set('platform', platform);
+  url.searchParams.set('id', id);
+  url.searchParams.set('game', input.gameName.slice(0, 120));
+  url.searchParams.set('name', input.name.slice(0, 160));
+  url.searchParams.set('desc', input.description.slice(0, 400));
+  if (input.percent !== null) url.searchParams.set('pct', input.percent.toFixed(1));
+  url.searchParams.set('lang', input.lang);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+  } catch {
+    throw new AppError('NETWORK');
+  }
+  const body: any = await res.json().catch(() => null);
+  if (res.ok && body?.steps) return body as Guide;
+  if (res.status === 429) throw new AppError(body?.error === 'TOO_FAST' ? 'RATE_LIMIT' : 'AI_LIMIT');
+  if (res.status === 503) throw new AppError(body?.error === 'AI_BUSY' ? 'AI_BUSY' : 'SERVICE_DOWN');
+  throw new AppError('AI_ERROR', body?.error ?? `HTTP ${res.status}`);
+}
+
 function playerStatsError(body: any): AppError | null {
   const err: string | undefined = body?.playerstats?.error;
   if (!err) return null;

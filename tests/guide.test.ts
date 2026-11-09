@@ -79,3 +79,19 @@ test('parses JSON wrapped in prose or fences', () => {
   assert.deepEqual(parseGuideJson('Oto wynik:\n```json\n{"a":1}\n```'), { a: 1 });
   assert.throws(() => parseGuideJson('brak'));
 });
+
+test('guide-text keys the cache by the full content and validates input', async () => {
+  const { store, waits, ctx, env } = setup();
+  const sent = fakeSteamAndAi(() => Response.json(geminiReply));
+  const base = 'https://w.dev/guide-text?platform=xbox&id=1777860928&game=Halo&lang=en';
+  const ok = await worker.fetch(new Request(`${base}&name=Legend&desc=Finish%20on%20Legendary`), env, ctx);
+  assert.equal(ok.status, 200);
+  await Promise.all(waits);
+  // inna treść = inny wpis, nie nadpisuje pierwszego
+  await worker.fetch(new Request(`${base}&name=Legend&desc=FAKE`), env, ctx);
+  await Promise.all(waits);
+  assert.equal([...store.keys()].filter((k) => k.startsWith('gt:')).length, 2);
+  assert.match(sent[0], /Halo \(Xbox\)/);
+  assert.equal((await worker.fetch(new Request(`${base}&name=${'x'.repeat(200)}`), env, ctx)).status, 400);
+  assert.equal((await worker.fetch(new Request('https://w.dev/guide-text?platform=psn&id=1&game=a&name=b&lang=en'), env, ctx)).status, 400);
+});

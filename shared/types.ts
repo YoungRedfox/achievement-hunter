@@ -25,8 +25,23 @@ export interface AchSummary {
   fetchedAt: number;
 }
 
+export type Platform = 'steam' | 'xbox';
+
 export interface LibraryGame extends OwnedGame {
   summary?: AchSummary;
+  platform: Platform;
+  /** unikalny klucz w bibliotece: "steam:620", "xbox:1777860928" */
+  key: string;
+  /** Xbox: identyfikator tytułu i okładka z Xbox Live */
+  titleId?: string;
+  image?: string;
+  /** Xbox 360 — szczegóły osiągnięć jeszcze nieobsługiwane */
+  legacy?: boolean;
+}
+
+export interface XboxAccount {
+  gamertag: string;
+  avatar: string;
 }
 
 export interface Achievement {
@@ -90,6 +105,7 @@ export interface Settings {
   demo: boolean;
   /** czy działa nasz serwer z kluczem — wtedy użytkownik wkleja tylko link */
   proxyAvailable: boolean;
+  xbox: XboxAccount | null;
 }
 
 export interface SettingsPatch {
@@ -117,6 +133,11 @@ export type ErrorCode =
   | 'AI_LIMIT'
   | 'AI_BUSY'
   | 'AI_ERROR'
+  | 'XBOX_INVALID_KEY'
+  | 'XBOX_LIMIT'
+  | 'XBOX_ERROR'
+  | 'XBOX_NOT_CONNECTED'
+  | 'XBOX_LEGACY'
   | 'UNKNOWN';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; code: ErrorCode; message?: string };
@@ -169,4 +190,8 @@ export interface Api {
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void;
   appVersion(): Promise<string>;
   installedGames(): Promise<{ appid: number; name: string }[]>;
+  connectXbox(key: string): Promise<Result<XboxAccount>>;
+  disconnectXbox(): Promise<Result<null>>;
+  getXboxGame(titleId: string, refresh: boolean): Promise<Result<GameDetail>>;
+  getXboxGuide(titleId: string, achId: string, refresh: boolean): Promise<Result<Guide>>;
 }

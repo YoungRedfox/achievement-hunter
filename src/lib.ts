@@ -35,10 +35,13 @@ export function formatMinutes(min: number) {
   return `${h} h`;
 }
 
-export function searchLinks(gameName: string, achName: string, appid: number) {
+export function searchLinks(gameName: string, achName: string, appid: number, xbox = false) {
   const q = encodeURIComponent(`${gameName} ${achName} achievement`);
   return {
-    steam: `https://steamcommunity.com/app/${appid}/guides/?searchText=${encodeURIComponent(achName)}&browsefilter=trend`,
+    // Xbox: największa baza poradników do osiągnięć Xbox to TrueAchievements
+    steam: xbox
+      ? `https://www.trueachievements.com/searchresults.aspx?search=${encodeURIComponent(`${gameName} ${achName}`)}`
+      : `https://steamcommunity.com/app/${appid}/guides/?searchText=${encodeURIComponent(achName)}&browsefilter=trend`,
     youtube: `https://www.youtube.com/results?search_query=${q}`,
     web: `https://www.google.com/search?q=${q}`,
   };

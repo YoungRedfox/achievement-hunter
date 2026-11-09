@@ -6,11 +6,13 @@ import { Icon } from './ui';
 
 export function Guide({
   appid,
+  xboxTitleId,
   gameName,
   achievement,
   onSettings,
 }: {
   appid: number;
+  xboxTitleId?: string;
   gameName: string;
   achievement: Achievement;
   onSettings: () => void;
@@ -19,12 +21,14 @@ export function Guide({
   const [guide, setGuide] = useState<GuideData | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
   const [loading, setLoading] = useState(true);
-  const links = searchLinks(gameName, achievement.name, appid);
+  const links = searchLinks(gameName, achievement.name, appid, !!xboxTitleId);
 
   async function load(refresh: boolean) {
     setLoading(true);
     setError(null);
-    const r = await api.getGuide(appid, achievement.apiname, refresh);
+    const r = xboxTitleId
+      ? await api.getXboxGuide(xboxTitleId, achievement.apiname, refresh)
+      : await api.getGuide(appid, achievement.apiname, refresh);
     setLoading(false);
     if (r.ok) setGuide(r.data);
     else setError(r.code);
@@ -38,7 +42,7 @@ export function Guide({
     <div className="guide-links">
       <span className="small-caps dim">{t('guide.more')}</span>
       <button className="chip" onClick={() => api.openExternal(links.steam)}>
-        {t('guide.steamGuides')} <Icon.External />
+        {xboxTitleId ? 'TrueAchievements' : t('guide.steamGuides')} <Icon.External />
       </button>
       <button className="chip" onClick={() => api.openExternal(links.youtube)}>
         {t('guide.youtube')} <Icon.External />

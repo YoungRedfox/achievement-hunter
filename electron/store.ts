@@ -5,6 +5,7 @@ import type { AiProvider } from '../shared/guide-core';
 import type { AchSummary, GameDetail, Guide, Lang, OwnedGame, Profile } from '../shared/types';
 import { DEFAULT_LANG, isLang } from '../shared/langs';
 import { AppError } from './errors';
+import type { XboxGame, XboxProfile } from './xbox';
 
 export interface StoreData {
   version: 1;
@@ -15,6 +16,9 @@ export interface StoreData {
   profile: Profile | null;
   /** wersja, której notatki gracz już widział — po aktualizacji pokazujemy „Co nowego” */
   lastSeenVersion?: string;
+  /** Xbox (OpenXBL): konto, gry z postępem i otwarte szczegóły */
+  xbox?: { profile: XboxProfile; games: { fetchedAt: number; list: XboxGame[] } | null } | null;
+  xboxDetails?: Record<string, GameDetail>;
   games: { fetchedAt: number; list: OwnedGame[] } | null;
   summaries: Record<string, AchSummary>;
   /** pełne listy osiągnięć otwieranych gier — kolejne otwarcie nie pobiera ich od nowa */
@@ -22,7 +26,7 @@ export interface StoreData {
   guides: Record<string, Guide>;
 }
 
-type SecretName = 'steamKey' | 'aiKey';
+type SecretName = 'steamKey' | 'aiKey' | 'xboxKey';
 
 function readJson<T>(file: string): T | null {
   try {
@@ -124,6 +128,8 @@ export class Store {
     this.data.summaries = {};
     this.data.details = {};
     this.data.guides = {};
+    this.data.xboxDetails = {};
+    if (this.data.xbox) this.data.xbox.games = null;
     this.flush();
   }
 

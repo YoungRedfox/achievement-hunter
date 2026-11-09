@@ -1,11 +1,12 @@
 import { memo, useMemo, useState } from 'react';
-import type { Library as LibraryData, LibraryGame } from '../../shared/types';
+import type { Library as LibraryData, LibraryGame, Platform } from '../../shared/types';
 import { errorKey, useLang, useT } from '../i18n';
 import { fmtDate, pct } from '../lib';
-import { Icon, SteamArt } from './ui';
+import { Icon, PlatformBadge, SteamArt } from './ui';
 
 export type Filter = 'progress' | 'untouched' | 'perfect' | 'all';
 type Sort = 'closest' | 'remaining' | 'recent' | 'playtime' | 'name';
+type PlatformFilter = 'any' | Platform;
 
 const inFilter = (g: LibraryGame, f: Filter) => {
   const s = g.summary;
@@ -27,24 +28,58 @@ function left(g: LibraryGame) {
   return g.summary ? g.summary.total - g.summary.achieved : Infinity;
 }
 
+// Ta sama gra na Steam i Xbox ma różne zapisy nazwy (™, ®, dwukropki) — porównujemy uproszczoną formę
+const normName = (n: string) =>
+  n
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .replace(/\b(pc|windows|edition|game of the year|goty)\b/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+
 export function Library({
   lib,
   onOpen,
   onRefresh,
+  onConnectXbox,
+  xboxConnected,
   filter,
   setFilter,
 }: {
   lib: LibraryData;
-  onOpen: (appid: number) => void;
+  onOpen: (game: LibraryGame) => void;
   onRefresh: () => void;
+  onConnectXbox: () => void;
+  xboxConnected: boolean;
   filter: Filter;
   setFilter: (f: Filter) => void;
 }) {
   const t = useT();
   const lang = useLang();
-  const games = lib.games;
+  const [platform, setPlatform] = useState<PlatformFilter>('any');
   const [sort, setSort] = useState<Sort>('recent');
   const [q, setQ] = useState('');
+
+  // Na jakich platformach jest każda gra (po nazwie) — karta pokazuje wszystkie
+  const platformsByName = useMemo(() => {
+    const m = new Map<string, Set<Platform>>();
+    for (const g of lib.games) {
+      const k = normName(g.name);
+      if (!m.has(k)) m.set(k, new Set());
+      m.get(k)!.add(g.platform);
+    }
+    return m;
+  }, [lib.games]);
+
+  const platformCounts = useMemo(
+    () => ({
+      any: lib.games.length,
+      steam: lib.games.filter((g) => g.platform === 'steam').length,
+      xbox: lib.games.filter((g) => g.platform === 'xbox').length,
+    }),
+    [lib.games],
+  );
+
+  const games = useMemo(() => (platform === 'any' ? lib.games : lib.games.filter((g) => g.platform === platform)), [lib.games, platform]);
 
   const stats = useMemo(() => {
     const withAch = games.filter((g) => g.summary && g.summary.total > 0);
@@ -102,6 +137,27 @@ export function Library({
         </p>
       )}
 
+      <div className="platforms" role="tablist" aria-label={t('platform.label')}>
+        {(['any', 'steam', 'xbox'] as const).map((p) =>
+          p === 'xbox' && !xboxConnected ? (
+            <button key={p} className="platform-tab add" onClick={onConnectXbox}>
+              <PlatformBadge platform="xbox" /> {t('xbox.connect')}
+            </button>
+          ) : (
+            <button
+              key={p}
+              role="tab"
+              aria-selected={platform === p}
+              className={`platform-tab ${platform === p ? 'on' : ''} ${p}`}
+              onClick={() => setPlatform(p)}
+            >
+              {p === 'any' ? t('platform.all') : <PlatformBadge platform={p} />}
+              <span className="count">{platformCounts[p]}</span>
+            </button>
+          ),
+        )}
+      </div>
+
       <div className="toolbar">
         <div className="tabs" role="tablist">
           {(['all', 'progress', 'untouched', 'perfect'] as const).map((f) => (
@@ -137,7 +193,7 @@ export function Library({
       ) : (
         <div className="grid">
           {list.map((g) => (
-            <GameCard key={g.appid} game={g} onOpen={onOpen} />
+            <GameCard key={g.key} game={g} onOpen={onOpen} platforms={platformsByName.get(normName(g.name))} />
           ))}
         </div>
       )}
@@ -145,15 +201,46 @@ export function Library({
   );
 }
 
-const GameCard = memo(function GameCard({ game, onOpen }: { game: LibraryGame; onOpen: (appid: number) => void }) {
+/** Okładka Xbox jest kwadratowa — na kartę 460×215 kładziemy ją na rozmytym tle z niej samej. */
+function XboxArt({ image, alt }: { image?: string; alt: string }) {
+  if (!image)
+    return (
+      <div className="art-fallback">
+        <span>{alt}</span>
+      </div>
+    );
+  return (
+    <div className="xbox-art">
+      <img className="xbox-art-bg" src={image} alt="" loading="lazy" draggable={false} />
+      <img className="xbox-art-fg" src={image} alt={alt} loading="lazy" draggable={false} />
+    </div>
+  );
+}
+
+const GameCard = memo(function GameCard({
+  game,
+  onOpen,
+  platforms,
+}: {
+  game: LibraryGame;
+  onOpen: (g: LibraryGame) => void;
+  platforms?: Set<Platform>;
+}) {
   const t = useT();
   const s = game.summary;
   const p = pct(game);
   const perfect = !!s && s.total > 0 && s.achieved === s.total;
+  // Pierwsza plakietka = platforma tej karty, potem pozostałe, na których ta gra też jest
+  const badges = [game.platform, ...[...(platforms ?? [])].filter((x) => x !== game.platform)];
   return (
-    <button className={`card ${perfect ? 'perfect' : ''}`} onClick={() => onOpen(game.appid)}>
+    <button className={`card ${perfect ? 'perfect' : ''}`} onClick={() => onOpen(game)}>
       <div className="card-art">
-        <SteamArt appid={game.appid} file="header.jpg" alt={game.name} />
+        {game.platform === 'xbox' ? <XboxArt image={game.image} alt={game.name} /> : <SteamArt appid={game.appid} file="header.jpg" alt={game.name} />}
+        <div className="card-platforms" title={badges.length > 1 ? t('platform.alsoOn') : undefined}>
+          {badges.map((b, i) => (
+            <PlatformBadge key={b} platform={b} dim={i > 0} />
+          ))}
+        </div>
         {perfect && <span className="badge-perfect">100%</span>}
       </div>
       <div className="card-body">

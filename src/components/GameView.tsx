@@ -4,9 +4,22 @@ import { errorKey, useLang, useT } from '../i18n';
 import { langInfo } from '../../shared/langs';
 import { api, fmtDate, hours, rarity } from '../lib';
 import { Guide } from './Guide';
-import { Icon, Ring, SteamArt } from './ui';
+import { Icon, PlatformBadge, Ring, SteamArt } from './ui';
 
-export function GameView({ appid, game, onBack, onSettings }: { appid: number; game?: LibraryGame; onBack: () => void; onSettings: () => void }) {
+export function GameView({
+  appid,
+  xbox,
+  game,
+  onBack,
+  onSettings,
+}: {
+  appid: number;
+  /** gra z Xbox: identyfikator tytułu i okładka */
+  xbox?: { titleId: string; image?: string };
+  game?: LibraryGame;
+  onBack: () => void;
+  onSettings: () => void;
+}) {
   const t = useT();
   const lang = useLang();
   const [refreshing, setRefreshing] = useState(false);
@@ -18,7 +31,7 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
   async function load(refresh: boolean) {
     setError(null);
     setRefreshing(refresh);
-    const r = await api.getGame(appid, refresh);
+    const r = xbox ? await api.getXboxGame(xbox.titleId, refresh) : await api.getGame(appid, refresh);
     setRefreshing(false);
     if (r.ok) setDetail(r.data);
     else if (refresh && detail) setDetail({ ...detail, stale: r.code });
@@ -29,7 +42,7 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
     setDetail(null);
     setOpen(null);
     void load(false);
-  }, [appid]);
+  }, [appid, xbox?.titleId]);
 
   const { missing, done } = useMemo(() => {
     const list = detail?.achievements ?? [];
@@ -49,7 +62,15 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
   return (
     <div className="page game">
       <div className="hero">
-        <SteamArt appid={appid} file="library_hero.jpg" alt="" className="hero-art" />
+        {xbox ? (
+          xbox.image ? (
+            <img className="hero-art xbox-hero" src={xbox.image} alt="" draggable={false} />
+          ) : (
+            <div className="art-fallback" />
+          )
+        ) : (
+          <SteamArt appid={appid} file="library_hero.jpg" alt="" className="hero-art" />
+        )}
         <div className="hero-shade" />
         <div className="hero-content">
           <button className="ghost back" onClick={onBack}>
@@ -61,7 +82,17 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
               <p className="hero-meta">
                 {game && game.playtimeMinutes > 0 && <span>{t('game.playtime', { h: hours(game.playtimeMinutes) })}</span>}
                 {total > 0 && <span>{t('game.left', { n: total - achieved })}</span>}
-                <button className="link" onClick={() => api.openExternal(`https://store.steampowered.com/app/${appid}`)}>
+                {xbox && <PlatformBadge platform="xbox" />}
+                <button
+                  className="link"
+                  onClick={() =>
+                    api.openExternal(
+                      xbox
+                        ? `https://www.xbox.com/search?q=${encodeURIComponent(name)}`
+                        : `https://store.steampowered.com/app/${appid}`,
+                    )
+                  }
+                >
                   {t('game.store')} ↗
                 </button>
               </p>
@@ -135,6 +166,7 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
                     open={open === a.apiname}
                     onToggle={() => setOpen(open === a.apiname ? null : a.apiname)}
                     appid={appid}
+                    xboxTitleId={xbox?.titleId}
                     gameName={name}
                     onSettings={onSettings}
                   />
@@ -153,6 +185,7 @@ function AchievementRow({
   open,
   onToggle,
   appid,
+  xboxTitleId,
   gameName,
   onSettings,
 }: {
@@ -160,6 +193,7 @@ function AchievementRow({
   open: boolean;
   onToggle: () => void;
   appid: number;
+  xboxTitleId?: string;
   gameName: string;
   onSettings: () => void;
 }) {
@@ -206,7 +240,7 @@ function AchievementRow({
         </div>
       </div>
       {open && (
-        <Guide appid={appid} gameName={gameName} achievement={a} onSettings={onSettings} />
+        <Guide appid={appid} xboxTitleId={xboxTitleId} gameName={gameName} achievement={a} onSettings={onSettings} />
       )}
     </li>
   );

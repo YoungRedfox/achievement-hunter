@@ -25,6 +25,10 @@ const api: Api = {
   whatsNewSeen: () => ipcRenderer.invoke('whatsnew:seen'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   installedGames: () => ipcRenderer.invoke('installed:get'),
+  connectXbox: (key) => ipcRenderer.invoke('xbox:connect', key),
+  disconnectXbox: () => ipcRenderer.invoke('xbox:disconnect'),
+  getXboxGame: (titleId, refresh) => ipcRenderer.invoke('xbox:game', titleId, refresh),
+  getXboxGuide: (titleId, achId, refresh) => ipcRenderer.invoke('xbox:guide', titleId, achId, refresh),
   onUpdateStatus: (cb) => {
     const h = (_: unknown, s: UpdateStatus) => cb(s);
     ipcRenderer.on('update:status', h);

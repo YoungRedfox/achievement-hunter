@@ -57,6 +57,7 @@ export default {
     if (url.pathname === '/health') return json({ ok: true });
     if (url.pathname === '/guide') return guide(url, req, env, ctx);
     if (url.pathname === '/progress') return progress(url, req, env);
+    if (url.pathname === '/guide-text') return guideText(url, req, env, ctx);
     if (!url.pathname.startsWith('/steam/')) return json({ error: 'NOT_FOUND' }, 404);
 
     const path = url.pathname.slice('/steam'.length);
@@ -214,4 +215,69 @@ async function progress(url: URL, req: Request, env: Env): Promise<Response> {
   return json({
     games: games.map((g) => ({ appid: g.appid, total: g.total_achievements ?? 0, achieved: (g.achievements ?? []).length })),
   });
+}
+
+// ---- poradniki dla gier spoza Steam (Xbox) ----
+// Nazwy przychodzą od aplikacji, więc klucz pamięci to skrót CAŁEJ treści: kto poda inne nazwy,
+// dostanie osobny wpis i nie nadpisze poradnika innym graczom.
+
+async function sha256(text: string) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function guideText(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Response> {
+  const q = (k: string) => url.searchParams.get(k) ?? '';
+  const platform = q('platform');
+  const id = q('id');
+  const game = q('game').trim();
+  const name = q('name').trim();
+  const desc = q('desc').trim();
+  const lang = q('lang');
+  const pctRaw = q('pct');
+  const pct = pctRaw ? Number(pctRaw) : null;
+  if (
+    platform !== 'xbox' ||
+    !/^\d{1,12}$/.test(id) ||
+    !game ||
+    game.length > 120 ||
+    !name ||
+    name.length > 160 ||
+    desc.length > 400 ||
+    !isLang(lang) ||
+    (pct !== null && !(pct >= 0 && pct <= 100))
+  ) {
+    return json({ error: 'BAD_REQUEST' }, 400);
+  }
+
+  const cacheKey = `gt:${await sha256(JSON.stringify([platform, id, game, name, desc, lang]))}`;
+  const cached = await env.GUIDES?.get(cacheKey).catch(() => null);
+  if (cached) return new Response(cached, { headers: { 'content-type': 'application/json; charset=utf-8' } });
+
+  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (env.GUIDE_LIMITER && !(await env.GUIDE_LIMITER.limit({ key: ip })).success) return json({ error: 'TOO_FAST' }, 429);
+
+  const provider = (AI_PROVIDERS.includes(env.AI_PROVIDER as AiProvider) ? env.AI_PROVIDER : 'gemini') as AiProvider;
+  const apiKey = provider === 'gemini' ? env.GEMINI_KEY : env.OPENAI_KEY;
+  if (!apiKey) return json({ error: 'SERVICE_DOWN' }, 503);
+
+  try {
+    const result = await generateGuide(provider, apiKey, env.AI_MODEL || DEFAULT_MODELS[provider], {
+      appid: Number(id),
+      gameName: `${game} (Xbox)`,
+      name,
+      description: desc,
+      percent: pct,
+      lang,
+    });
+    const body = JSON.stringify(result);
+    if (env.GUIDES) ctx.waitUntil(env.GUIDES.put(cacheKey, body, { expirationTtl: GUIDE_TTL }).catch(() => undefined));
+    return new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8' } });
+  } catch (e) {
+    const code = e instanceof GuideError ? e.code : 'AI_ERROR';
+    if (code === 'AI_BUSY') return json({ error: 'AI_BUSY' }, 503);
+    if (code === 'AI_LIMIT') return json({ error: 'AI_LIMIT' }, 429);
+    if (code === 'AI_INVALID_KEY') return json({ error: 'SERVICE_DOWN' }, 503);
+    return json({ error: 'AI_ERROR' }, 502);
+  }
 }

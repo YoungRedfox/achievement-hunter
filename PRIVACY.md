@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 9 November 2026_
+_Last updated: 10 November 2026_
 
 Achievement Hunter ("the app") is a free, open-source Windows app by YoungRedfox. This policy explains what data the app and its server handle. Short version: your data stays on your PC, and our server doesn't keep anything about you.
 
@@ -15,7 +15,7 @@ The app saves, **only on your PC** and encrypted with Windows (DPAPI):
 
 - the Steam profile you connected (SteamID, name, avatar link);
 - your game list, achievement progress and generated guides (cache);
-- optional keys you entered yourself (Steam Web API key, AI key) and your settings.
+- optional keys you entered yourself (Steam Web API key, AI key, OpenXBL key for Xbox) and your settings.
 
 You can delete all of it at any time: *Settings → Disconnect profile* or *Clear cache*, or uninstall the app.
 
@@ -30,6 +30,7 @@ The app also reads Steam's local files (`libraryfolders.vdf`, `appmanifest_*.acf
 | Steam / Valve (`api.steampowered.com`, Steam CDN) | game and achievement IDs, image requests | achievement names, icons, game artwork |
 | Google (Gemini API), via our server | game name and achievement name and description | to write the guide text |
 | GitHub | a request for the latest version file | update checks |
+| OpenXBL (`xbl.io`), only if you connect Xbox | your own OpenXBL key, your Xbox user ID | your Xbox games and achievements |
 
 Every request also exposes your IP address to the service that receives it, as with any internet connection.
 
@@ -43,6 +44,7 @@ Every request also exposes your IP address to the service that receives it, as w
 - Valve Corporation (Steam): <https://store.steampowered.com/privacy_agreement/>
 - Google (Gemini API): <https://policies.google.com/privacy>
 - OpenAI (only if you add your own OpenAI key): <https://openai.com/policies/privacy-policy>
+- OpenXBL (only if you connect Xbox): <https://xbl.io/agreement>
 - GitHub, Inc. (downloads and updates): <https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement>
 
 ## Legal basis and your rights (EU/EEA)

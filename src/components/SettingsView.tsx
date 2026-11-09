@@ -3,7 +3,9 @@ import type { Settings } from '../../shared/types';
 import { LangSelect } from './LangSelect';
 import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
+import { useEffect } from 'react';
 import { About } from './About';
+import { XboxSettings } from './XboxSettings';
 import { Spinner } from './ui';
 
 const AI_NAMES = { gemini: 'Google Gemini', openai: 'OpenAI' } as const;
@@ -11,9 +13,13 @@ const AI_KEY_PAGES = { gemini: 'https://aistudio.google.com/apikey', openai: 'ht
 
 export function SettingsView({
   settings,
+  section,
+  onXboxChange,
   onChange,
   onDisconnect,
 }: {
+  section?: string;
+  onXboxChange: () => void;
   settings: Settings;
   onChange: (s: Settings) => void;
   onDisconnect: () => void;
@@ -41,6 +47,10 @@ export function SettingsView({
 
   const note = (section: string) =>
     msg?.section === section && <span className={`save-note ${msg.error ? 'err' : ''}`}>{msg.text}</span>;
+
+  useEffect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [section]);
 
   const p = settings.profile;
 
@@ -78,6 +88,8 @@ export function SettingsView({
           )}
         </div>
       </section>
+
+      <XboxSettings settings={settings} onChange={onXboxChange} />
 
       <section className="setting">
         <div className="setting-label">
@@ -180,6 +192,7 @@ export function SettingsView({
             <li>{t('privacy.local')}</li>
             <li>{t('privacy.server')}</li>
             <li>{t('privacy.own')}</li>
+            {settings.xbox && <li>{t('privacy.xbox')}</li>}
           </ul>
         </div>
       </section>

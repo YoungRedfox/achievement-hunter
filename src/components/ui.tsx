@@ -136,6 +136,11 @@ export function Ring({ value, size = 64, stroke = 4, children }: { value: number
   );
 }
 
+/** Plakietka platformy: kolorowa kropka + nazwa. Bez logotypów firm — tylko nazwa, czytelnie i bez ryzyka znaków towarowych. */
+export function PlatformBadge({ platform, dim }: { platform: 'steam' | 'xbox'; dim?: boolean }) {
+  return <span className={`pbadge ${platform} ${dim ? 'dim' : ''}`}>{platform === 'steam' ? 'Steam' : 'Xbox'}</span>;
+}
+
 export function Spinner() {
   return <span className="spinner" aria-hidden />;
 }

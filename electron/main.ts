@@ -6,9 +6,10 @@ import { demoGuide, demoProvider } from './demo';
 import { AppError, sleep, toResult } from './errors';
 import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide } from '../shared/guide-core';
 import type { SteamKey } from './provider';
-import { proxyGuide, proxyUrl, steamProvider } from './steam';
+import { proxyGuide, proxyGuideText, proxyUrl, steamProvider } from './steam';
 import { isLang } from '../shared/langs';
 import { installedGames } from './steam-local';
+import { xboxGameDetail, xboxGames, xboxProfile } from './xbox';
 import { Store } from './store';
 import { checkForUpdates, downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
@@ -63,13 +64,30 @@ function settings(): Settings {
     profile: store.data.profile,
     demo: isDemo,
     proxyAvailable: proxyAvailable(),
+    xbox: store.data.xbox?.profile ? { gamertag: store.data.xbox.profile.gamertag, avatar: store.data.xbox.profile.avatar } : null,
   };
 }
 
 function library(stale?: ErrorCode): Library {
   const g = store.data.games;
   return {
-    games: (g?.list ?? []).map((x) => ({ ...x, summary: store.data.summaries[x.appid] })),
+    games: [
+      ...(g?.list ?? []).map((x) => ({ ...x, summary: store.data.summaries[x.appid], platform: 'steam' as const, key: `steam:${x.appid}` })),
+      // Gry Xbox w tym samym kształcie co Steam — biblioteka pokazuje wszystko razem
+      ...(store.data.xbox?.games?.list ?? []).map((x) => ({
+        appid: 0,
+        name: x.name,
+        playtimeMinutes: 0,
+        lastPlayed: x.lastPlayed,
+        hasStats: true,
+        summary: { total: x.total, achieved: x.achieved, fetchedAt: store.data.xbox!.games!.fetchedAt },
+        platform: 'xbox' as const,
+        key: `xbox:${x.titleId}`,
+        titleId: x.titleId,
+        image: x.image,
+        legacy: x.legacy,
+      })),
+    ],
     fetchedAt: g?.fetchedAt ?? 0,
     stale,
   };
@@ -160,6 +178,82 @@ async function loadDetail(appid: number, refresh: boolean): Promise<GameDetail> 
   }
 }
 
+// ---- Xbox (OpenXBL, klucz gracza) ----
+
+const XBOX_TTL = 6 * 3600_000;
+
+function xboxKey(): string {
+  const key = store.getSecret('xboxKey');
+  if (!key || !store.data.xbox?.profile) throw new AppError('XBOX_NOT_CONNECTED');
+  return key;
+}
+
+async function refreshXbox(force: boolean) {
+  if (!store.data.xbox?.profile || !store.getSecret('xboxKey')) return;
+  const cached = store.data.xbox.games;
+  if (!force && cached && Date.now() - cached.fetchedAt < XBOX_TTL) return;
+  const list = await xboxGames(xboxKey());
+  store.data.xbox.games = { fetchedAt: Date.now(), list };
+  store.save();
+}
+
+// Tryb demo: gry Xbox udawane z listy demo (titleId = 900000000 + appid Steam)
+const DEMO_XBOX: [number, string, number, number][] = [
+  [367520, 'Hollow Knight', 21, 63],
+  [1145360, 'Hades', 49, 49],
+  [504230, 'Celeste', 12, 32],
+  [646570, 'Slay the Spire', 0, 46],
+];
+function demoXbox() {
+  store.data.xbox = {
+    profile: { xuid: '0', gamertag: 'LisXbox', avatar: '' },
+    games: {
+      fetchedAt: Date.now(),
+      list: DEMO_XBOX.map(([appid, name, achieved, total], i) => ({
+        titleId: String(900000000 + appid),
+        name,
+        image: `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`,
+        lastPlayed: 1_731_000_000 - i * 500_000,
+        legacy: false,
+        total,
+        achieved,
+        gamerscore: achieved * 10,
+        totalGamerscore: total * 10,
+      })),
+    },
+  };
+}
+
+async function loadXboxDetail(titleId: string, refresh: boolean): Promise<GameDetail> {
+  if (isDemo) {
+    const g = store.data.xbox?.games?.list.find((x) => x.titleId === titleId);
+    const d = await demoProvider.gameDetail(Number(titleId) - 900000000, g?.name ?? '', '', null, store.data.lang);
+    return { ...d, appid: 0 };
+  }
+  const details = (store.data.xboxDetails ??= {});
+  const cached = details[titleId];
+  const game = store.data.xbox?.games?.list.find((g) => g.titleId === titleId);
+  if (!game) throw new AppError('INVALID_INPUT');
+  const lang = store.data.lang;
+  // Jak przy Steam: pobieramy tylko gdy brak zapisu, inny język albo grałeś od ostatniego pobrania
+  const outdated = !cached || cached.lang !== lang || game.lastPlayed * 1000 > cached.fetchedAt;
+  if (cached && !refresh && !outdated) return cached;
+  if (game.legacy) throw new AppError('XBOX_LEGACY');
+  try {
+    const detail = await xboxGameDetail(xboxKey(), store.data.xbox!.profile.xuid, game, lang);
+    details[titleId] = detail;
+    // Licznik na karcie zgodny ze szczegółami
+    game.achieved = detail.achievements.filter((a) => a.achieved).length;
+    game.total = detail.achievements.length || game.total;
+    store.save();
+    return detail;
+  } catch (e) {
+    const code = softCode(e) ?? (e instanceof AppError && e.code === 'XBOX_LIMIT' ? 'XBOX_LIMIT' : null);
+    if (cached && code) return { ...cached, stale: code as ErrorCode };
+    throw e;
+  }
+}
+
 function registerIpc() {
   ipcMain.handle('settings:get', () => toResult(async () => settings()));
 
@@ -217,6 +311,7 @@ function registerIpc() {
 
   ipcMain.handle('library:get', (_e, refresh: boolean) =>
     toResult(async () => {
+      await refreshXbox(refresh).catch((e) => console.warn('xbox refresh', e instanceof Error ? e.message : e));
       const g = store.data.games;
       const sync = () => setTimeout(() => syncProgress(false).catch((e) => console.error('sync failed', e)), 300);
       if (!refresh && g && Date.now() - g.fetchedAt < LIBRARY_TTL) {
@@ -298,6 +393,67 @@ function registerIpc() {
     }),
   );
 
+  ipcMain.handle('xbox:connect', (_e, rawKey: string) =>
+    toResult(async () => {
+      if (isDemo) {
+        demoXbox();
+        return { gamertag: 'LisXbox', avatar: '' };
+      }
+      const key = rawKey.trim();
+      if (key.length < 20) throw new AppError('XBOX_INVALID_KEY');
+      const profile = await xboxProfile(key);
+      const list = await xboxGames(key);
+      store.setSecret('xboxKey', key);
+      store.data.xbox = { profile, games: { fetchedAt: Date.now(), list } };
+      store.data.xboxDetails = {};
+      store.flush();
+      return { gamertag: profile.gamertag, avatar: profile.avatar };
+    }),
+  );
+
+  ipcMain.handle('xbox:disconnect', () =>
+    toResult(async () => {
+      store.setSecret('xboxKey', null);
+      store.data.xbox = null;
+      store.data.xboxDetails = {};
+      store.flush();
+      return null;
+    }),
+  );
+
+  ipcMain.handle('xbox:game', (_e, titleId: string, refresh: boolean) => toResult(() => loadXboxDetail(titleId, refresh)));
+
+  ipcMain.handle('xbox:guide', (_e, titleId: string, achId: string, refresh: boolean) =>
+    toResult(async () => {
+      const lang = store.data.lang;
+      const cacheKey = `xbox:${titleId}:${achId}:${lang}`;
+      const cached = store.data.guides[cacheKey];
+      if (cached && !refresh) return cached;
+      const detail = await loadXboxDetail(titleId, false);
+      const a = detail.achievements.find((x) => x.apiname === achId);
+      if (!a) throw new AppError('INVALID_INPUT');
+      const input = { appid: Number(titleId), gameName: detail.name, name: a.name, description: a.description, percent: a.percent, lang };
+      const ownKey = store.getSecret('aiKey');
+      let guide;
+      if (ownKey) {
+        const provider = store.data.aiProvider;
+        try {
+          guide = await generateGuide(provider, ownKey, store.data.aiModel || DEFAULT_MODELS[provider], input);
+        } catch (e) {
+          if (e instanceof GuideError) throw new AppError(e.code, e.message);
+          throw e;
+        }
+      } else if (proxyAvailable()) {
+        guide = await proxyGuideText('xbox', titleId, input);
+      } else {
+        throw new AppError('NO_AI_KEY');
+      }
+      store.data.guides[cacheKey] = guide;
+      store.flush();
+      return guide;
+    }),
+  );
+
   ipcMain.handle('open:external', (_e, url: string) => openSafe(url));
   ipcMain.handle('app:version', () => app.getVersion());
   // Demo: kilka gier z listy demo udaje zainstalowane
@@ -311,7 +467,7 @@ function registerIpc() {
     const current = app.getVersion();
     const seen = store.data.lastSeenVersion;
     // Demo: AH_DEMO_WHATSNEW=1 udaje świeżą aktualizację
-    if (isDemo && process.env.AH_DEMO_WHATSNEW === '1') return { show: true, from: '0.3.0', current };
+    if (isDemo) return { show: process.env.AH_DEMO_WHATSNEW === '1', from: '0.3.0', current };
     // Nowa instalacja (brak profilu i zapisu) = bez okna; aktualizacja = okno z notatkami
     if (!seen && !store.data.profile) {
       store.data.lastSeenVersion = current;
@@ -407,6 +563,10 @@ app.whenReady().then(async () => {
   if (isDemo && process.env.AH_DEMO_CONNECTED === '1' && !store.data.profile) {
     store.data.profile = await demoProvider.resolveProfile('', null);
     store.data.games = { fetchedAt: Date.now(), list: await demoProvider.ownedGames('', null) };
+    store.flush();
+  }
+  if (isDemo && process.env.AH_DEMO_XBOX === '1') {
+    demoXbox();
     store.flush();
   }
   registerIpc();
