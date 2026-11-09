@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Achievement, ErrorCode, GameDetail, LibraryGame } from '../../shared/types';
 import { errorKey, useLang, useT } from '../i18n';
-import { api, hours, rarity } from '../lib';
+import { api, fmtDate, hours, rarity } from '../lib';
 import { Guide } from './Guide';
 import { Icon, Ring, SteamArt } from './ui';
 
 export function GameView({ appid, game, onBack, onSettings }: { appid: number; game?: LibraryGame; onBack: () => void; onSettings: () => void }) {
   const t = useT();
+  const lang = useLang();
+  const [refreshing, setRefreshing] = useState(false);
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [error, setError] = useState<ErrorCode | null>(null);
   const [tab, setTab] = useState<'missing' | 'done'>('missing');
@@ -14,8 +16,11 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
 
   async function load(refresh: boolean) {
     setError(null);
+    setRefreshing(refresh);
     const r = await api.getGame(appid, refresh);
+    setRefreshing(false);
     if (r.ok) setDetail(r.data);
+    else if (refresh && detail) setDetail({ ...detail, stale: r.code });
     else setError(r.code);
   }
 
@@ -105,11 +110,18 @@ export function GameView({ appid, game, onBack, onSettings }: { appid: number; g
               </div>
               <div className="toolbar-right">
                 {tab === 'missing' && <span className="dim small-caps">{t('game.sort.hint')}</span>}
-                <button className="icon-btn" title={t('library.refresh')} onClick={() => load(true)}>
+                <span className="saved-at">{t('game.saved', { d: fmtDate(detail.fetchedAt, lang) })}</span>
+                <button className={`icon-btn ${refreshing ? 'spin' : ''}`} title={t('library.refresh')} onClick={() => load(true)} disabled={refreshing}>
                   <Icon.Refresh />
                 </button>
               </div>
             </div>
+
+            {detail.stale && (
+              <p className="stale">
+                {t(errorKey(detail.stale))} {t('stale.saved', { d: fmtDate(detail.fetchedAt, lang) })}
+              </p>
+            )}
 
             {list.length === 0 ? (
               <p className="empty">{tab === 'missing' ? t('game.allDone') : t('game.noneDone')}</p>

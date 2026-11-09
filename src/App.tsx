@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ErrorCode, LibraryGame, ScanProgress, Settings } from '../shared/types';
+import type { ErrorCode, Library as LibraryData, ScanProgress, Settings } from '../shared/types';
 import { Connect } from './components/Connect';
 import { GameView } from './components/GameView';
 import { Library, type Filter } from './components/Library';
@@ -23,10 +23,11 @@ const go = (r: Route) => {
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [route, setRoute] = useState<Route>(() => parseHash(location.hash));
-  const [games, setGames] = useState<LibraryGame[] | null>(null);
+  const [lib, setLib] = useState<LibraryData | null>(null);
   const [libError, setLibError] = useState<ErrorCode | null>(null);
   const [scan, setScan] = useState<ScanProgress>({ done: 0, total: 0, running: false });
-  const [filter, setFilter] = useState<Filter>('progress');
+  // Domyślnie wszystkie gry — gracz sam wybiera, którą sprawdzić
+  const [filter, setFilter] = useState<Filter>('all');
 
   const t = useMemo(() => makeT(settings?.lang ?? 'pl'), [settings?.lang]);
 
@@ -38,9 +39,9 @@ export function App() {
     };
     window.addEventListener('hashchange', onHash);
     const offProgress = api.onScanProgress(setScan);
-    // Wyniki skanu spływają po jednej grze — karta aktualizuje się od razu
+    // Wynik każdej sprawdzonej gry od razu trafia na jej kartę
     const offSummary = api.onSummary((appid, s) =>
-      setGames((prev) => prev && prev.map((g) => (g.appid === appid ? { ...g, summary: s } : g))),
+      setLib((prev) => prev && { ...prev, games: prev.games.map((g) => (g.appid === appid ? { ...g, summary: s } : g)) }),
     );
     return () => {
       window.removeEventListener('hashchange', onHash);
@@ -52,9 +53,8 @@ export function App() {
   const loadLibrary = useCallback(async (refresh: boolean) => {
     setLibError(null);
     const r = await api.getLibrary(refresh);
-    if (!r.ok) return setLibError(r.code);
-    setGames(r.data);
-    void api.startScan(refresh);
+    if (r.ok) setLib(r.data);
+    else setLibError(r.code);
   }, []);
 
   const connected = !!settings?.profile;
@@ -69,13 +69,24 @@ export function App() {
   if (!settings.profile) {
     return (
       <LangContext.Provider value={ctx}>
-        <Connect demo={settings.demo} onConnected={(profile) => setSettings({ ...settings, profile, hasSteamKey: true })} />
+        <Connect
+          demo={settings.demo}
+          needsKey={!settings.proxyAvailable}
+          onConnected={(profile) => setSettings({ ...settings, profile })}
+        />
       </LangContext.Provider>
     );
   }
 
   const p = settings.profile;
-  const scanPct = scan.total ? (scan.done / scan.total) * 100 : 0;
+  const withStats = lib?.games.filter((g) => g.hasStats) ?? [];
+  const checked = withStats.filter((g) => g.summary).length;
+  const rest = withStats.length - checked;
+
+  function checkRest() {
+    const minutes = Math.max(1, Math.round(rest / 150));
+    if (confirm(t('scan.confirm', { n: rest, m: minutes }))) void api.startScan(false);
+  }
 
   return (
     <LangContext.Provider value={ctx}>
@@ -96,26 +107,38 @@ export function App() {
           </nav>
 
           <div className="sidebar-foot">
-            <div className={`scan ${scan.running ? 'running' : ''}`}>
-              <div className="scan-text">
-                <span>{scan.running ? t('scan.running') : t('scan.done')}</span>
-                {scan.running && (
-                  <span className="mono">
-                    {scan.done}/{scan.total}
-                  </span>
+            {lib && withStats.length > 0 && (
+              <div className={`scan ${scan.running ? 'running' : ''}`}>
+                {scan.running ? (
+                  <>
+                    <div className="scan-text">
+                      <span>{t('scan.running')}</span>
+                      <span className="mono">
+                        {scan.done}/{scan.total}
+                      </span>
+                    </div>
+                    <div className="bar thin">
+                      <i style={{ width: `${scan.total ? (scan.done / scan.total) * 100 : 0}%` }} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="scan-text">
+                      <span>{rest > 0 ? t('scan.checked', { n: checked, total: withStats.length }) : t('scan.allDone')}</span>
+                    </div>
+                    <div className="bar thin">
+                      <i style={{ width: `${(checked / withStats.length) * 100}%` }} />
+                    </div>
+                    {rest > 0 && (
+                      <button className="scan-btn" onClick={checkRest}>
+                        {t('scan.rest')} <span className="mono dim">{rest}</span>
+                      </button>
+                    )}
+                  </>
                 )}
-                {!scan.running && (
-                  <button className="icon-btn" title={t('library.refresh')} onClick={() => loadLibrary(true)}>
-                    <Icon.Refresh />
-                  </button>
-                )}
+                {scan.error && !scan.running && <p className="scan-error">{t(errorKey(scan.error))}</p>}
               </div>
-              {scan.running && (
-                <div className="bar thin">
-                  <i style={{ width: `${scanPct}%` }} />
-                </div>
-              )}
-            </div>
+            )}
             <button className="me" onClick={() => go({ name: 'settings' })}>
               {p.avatar ? <img src={p.avatar} alt="" /> : <div className="avatar-fallback">{p.name.slice(0, 1)}</div>}
               <span>{p.name}</span>
@@ -135,7 +158,7 @@ export function App() {
                 if (langChanged) void loadLibrary(false);
               }}
               onDisconnect={() => {
-                setGames(null);
+                setLib(null);
                 setSettings({ ...settings, profile: null, hasSteamKey: false });
                 go({ name: 'library' });
               }}
@@ -144,7 +167,7 @@ export function App() {
             <GameView
               key={route.appid}
               appid={route.appid}
-              game={games?.find((g) => g.appid === route.appid)}
+              game={lib?.games.find((g) => g.appid === route.appid)}
               onBack={() => history.back()}
               onSettings={() => go({ name: 'settings' })}
             />
@@ -157,8 +180,14 @@ export function App() {
                 </button>
               </div>
             </div>
-          ) : games ? (
-            <Library games={games} filter={filter} setFilter={setFilter} onOpen={(appid) => go({ name: 'game', appid })} />
+          ) : lib ? (
+            <Library
+              lib={lib}
+              filter={filter}
+              setFilter={setFilter}
+              onRefresh={() => loadLibrary(true)}
+              onOpen={(appid) => go({ name: 'game', appid })}
+            />
           ) : (
             <div className="page">
               <div className="grid">

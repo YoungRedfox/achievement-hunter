@@ -1,22 +1,24 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { GameDetail, LibraryGame, ScanProgress, Settings, SettingsPatch } from '../shared/types';
+import type { ErrorCode, GameDetail, Library, ScanProgress, Settings, SettingsPatch } from '../shared/types';
 import { demoGuide, demoProvider } from './demo';
 import { AppError, toResult } from './errors';
 import { generateGuide } from './guide';
-import { steamProvider } from './steam';
+import type { SteamKey } from './provider';
+import { proxyUrl, steamProvider } from './steam';
 import { DEFAULT_MODEL, Store } from './store';
 
 const isDemo = process.env.AH_DEMO === '1';
 const provider = isDemo ? demoProvider : steamProvider;
-const LIBRARY_TTL = 6 * 3600_000;
-const SUMMARY_TTL = 24 * 3600_000;
-const DETAIL_TTL = 10 * 60_000;
+// Lista gier odświeża się sama raz na dobę; osiągnięcia gry tylko gdy w nią grałeś od ostatniego pobrania
+const LIBRARY_TTL = 24 * 3600_000;
+// Błędy, przy których lepiej pokazać zapisane dane niż pusty ekran
+const SOFT: ErrorCode[] = ['DAILY_LIMIT', 'NETWORK', 'RATE_LIMIT', 'SERVICE_DOWN'];
+const softCode = (e: unknown): ErrorCode | null => (e instanceof AppError && SOFT.includes(e.code) ? e.code : null);
 
 let win: BrowserWindow | null = null;
 let store: Store;
-const details = new Map<number, GameDetail>();
 
 if (isDemo) app.setPath('userData', path.join(app.getPath('temp'), 'achievement-hunter-demo'));
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -35,59 +37,68 @@ function send(channel: string, ...args: unknown[]) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
 }
 
-function steamKey() {
-  if (isDemo) return 'demo';
-  const key = store.getSecret('steamKey');
-  if (!key || !store.data.profile) throw new AppError('NOT_CONNECTED');
-  return key;
+const proxyAvailable = () => isDemo || !!proxyUrl();
+
+/** Klucz do zapytań: własny użytkownika albo null = nasz serwer. */
+function steamKey(): SteamKey {
+  if (!store.data.profile) throw new AppError('NOT_CONNECTED');
+  if (isDemo) return null;
+  const own = store.getSecret('steamKey');
+  if (!own && !proxyAvailable()) throw new AppError('INVALID_KEY');
+  return own;
 }
 
 function settings(): Settings {
   return {
     lang: store.data.lang,
-    hasSteamKey: isDemo || !!store.getSecret('steamKey'),
+    hasSteamKey: !!store.getSecret('steamKey'),
     hasOpenAiKey: isDemo || !!store.getSecret('openAiKey'),
     openAiModel: store.data.openAiModel,
     profile: store.data.profile,
     demo: isDemo,
+    proxyAvailable: proxyAvailable(),
   };
 }
 
-function library(): LibraryGame[] {
-  return (store.data.games?.list ?? []).map((g) => ({ ...g, summary: store.data.summaries[g.appid] }));
+function library(stale?: ErrorCode): Library {
+  const g = store.data.games;
+  return {
+    games: (g?.list ?? []).map((x) => ({ ...x, summary: store.data.summaries[x.appid] })),
+    fetchedAt: g?.fetchedAt ?? 0,
+    stale,
+  };
 }
 
-// ---- skanowanie osiągnięć całej biblioteki w tle ----
+function setSummary(detail: GameDetail) {
+  const summary = {
+    total: detail.achievements.length,
+    achieved: detail.achievements.filter((a) => a.achieved).length,
+    fetchedAt: detail.fetchedAt,
+  };
+  store.data.summaries[detail.appid] = summary;
+  send('scan:summary', detail.appid, summary);
+}
+
+// ---- sprawdzanie wszystkich gier: tylko na wyraźne żądanie, bo zużywa dzienny limit ----
 
 let scanning = false;
-
-async function pool<T>(items: T[], size: number, fn: (item: T) => Promise<void>) {
-  let i = 0;
-  const workers = Array.from({ length: Math.min(size, items.length) }, async () => {
-    while (i < items.length) await fn(items[i++]);
-  });
-  await Promise.all(workers);
-}
 
 async function runScan(force: boolean) {
   if (scanning) return;
   const key = steamKey();
   const steamid = store.data.profile!.steamid;
-  const now = Date.now();
-  // Ostatnio grane najpierw — to te gry użytkownik chce zobaczyć od razu
+  // Tylko gry jeszcze niesprawdzone (force = wszystkie); ostatnio grane najpierw
   const todo = (store.data.games?.list ?? [])
-    .filter((g) => {
-      if (!g.hasStats) return false;
-      const s = store.data.summaries[g.appid];
-      return force || !s || now - s.fetchedAt > SUMMARY_TTL || g.lastPlayed * 1000 > s.fetchedAt;
-    })
+    .filter((g) => g.hasStats && (force || !store.data.summaries[g.appid]))
     .sort((a, b) => b.lastPlayed - a.lastPlayed);
 
   scanning = true;
   const progress: ScanProgress = { done: 0, total: todo.length, running: true };
   send('scan:progress', progress);
-  try {
-    await pool(todo, 4, async (g) => {
+  let i = 0;
+  const worker = async () => {
+    while (i < todo.length && !progress.error) {
+      const g = todo[i++];
       try {
         const s = await provider.achievementSummary(g.appid, steamid, key);
         const summary = { ...s, fetchedAt: Date.now() };
@@ -95,12 +106,17 @@ async function runScan(force: boolean) {
         store.save();
         send('scan:summary', g.appid, summary);
       } catch (e) {
-        if (e instanceof AppError && (e.code === 'INVALID_KEY' || e.code === 'PRIVATE_GAMES')) throw e;
-        console.warn(`scan ${g.appid}:`, e instanceof Error ? e.message : e);
+        // Limit albo awaria serwera: przerywamy, żeby nie palić zapytań na próżno
+        const code = softCode(e) ?? (e instanceof AppError && e.code === 'PRIVATE_GAMES' ? e.code : null);
+        if (code && code !== 'NETWORK') progress.error = code;
+        else console.warn(`scan ${g.appid}:`, e instanceof Error ? e.message : e);
       }
       progress.done++;
       send('scan:progress', progress);
-    });
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: Math.min(4, todo.length) }, worker));
   } finally {
     scanning = false;
     send('scan:progress', { ...progress, running: false });
@@ -109,22 +125,24 @@ async function runScan(force: boolean) {
 }
 
 async function loadDetail(appid: number, refresh: boolean): Promise<GameDetail> {
-  const cached = details.get(appid);
-  if (cached && !refresh && Date.now() - cached.fetchedAt < DETAIL_TTL) return cached;
-  const key = steamKey();
+  const cached = store.data.details[appid];
   const game = store.data.games?.list.find((g) => g.appid === appid);
-  const detail = await provider.gameDetail(appid, game?.name ?? `App ${appid}`, store.data.profile!.steamid, key, store.data.lang);
-  details.set(appid, detail);
-  // Szczegóły są świeższe niż skan — poprawiamy licznik na karcie biblioteki
-  const summary = {
-    total: detail.achievements.length,
-    achieved: detail.achievements.filter((a) => a.achieved).length,
-    fetchedAt: Date.now(),
-  };
-  store.data.summaries[appid] = summary;
-  store.save();
-  send('scan:summary', appid, summary);
-  return detail;
+  const lang = store.data.lang;
+  // Pobieramy tylko gdy trzeba: brak zapisu, inny język albo grałeś od ostatniego pobrania
+  const outdated = !cached || cached.lang !== lang || (!!game && game.lastPlayed * 1000 > cached.fetchedAt);
+  if (cached && !refresh && !outdated) return cached;
+
+  try {
+    const detail = await provider.gameDetail(appid, game?.name ?? `App ${appid}`, store.data.profile!.steamid, steamKey(), lang);
+    store.data.details[appid] = detail;
+    setSummary(detail);
+    store.save();
+    return detail;
+  } catch (e) {
+    const code = softCode(e);
+    if (cached && code) return { ...cached, stale: code };
+    throw e;
+  }
 }
 
 function registerIpc() {
@@ -132,33 +150,34 @@ function registerIpc() {
 
   ipcMain.handle('settings:update', (_e, patch: SettingsPatch) =>
     toResult(async () => {
-      if (patch.lang && patch.lang !== store.data.lang) {
-        store.data.lang = patch.lang;
-        details.clear();
-      }
+      if (patch.lang) store.data.lang = patch.lang;
       if (patch.openAiModel !== undefined) store.data.openAiModel = patch.openAiModel.trim() || DEFAULT_MODEL;
       if (patch.openAiKey !== undefined) store.setSecret('openAiKey', patch.openAiKey?.trim() || null);
       if (patch.steamKey !== undefined) {
         const profile = store.data.profile;
         if (!profile) throw new AppError('NOT_CONNECTED');
+        const key = patch.steamKey?.trim() || null;
+        if (!key && !proxyAvailable()) throw new AppError('INVALID_KEY');
         // Nowy klucz sprawdzamy na istniejącym profilu, zanim go zapiszemy
-        await provider.resolveProfile(profile.steamid, patch.steamKey.trim());
-        store.setSecret('steamKey', patch.steamKey.trim());
+        if (key) await provider.resolveProfile(profile.steamid, key);
+        store.setSecret('steamKey', key);
       }
       store.flush();
       return settings();
     }),
   );
 
-  ipcMain.handle('account:connect', (_e, input: string, key: string) =>
+  ipcMain.handle('account:connect', (_e, input: string, rawKey?: string) =>
     toResult(async () => {
-      const profile = await provider.resolveProfile(input, key.trim());
+      const key = rawKey?.trim() || null;
+      if (!key && !proxyAvailable()) throw new AppError('INVALID_KEY');
+      const profile = await provider.resolveProfile(input, key);
       // Lista gier od razu — tu wychodzi ukryte "Szczegóły gry"
-      const list = await provider.ownedGames(profile.steamid, key.trim());
+      const list = await provider.ownedGames(profile.steamid, key);
       if (store.data.profile?.steamid !== profile.steamid) store.clearCache();
       store.data.profile = profile;
       store.data.games = { fetchedAt: Date.now(), list };
-      if (!isDemo) store.setSecret('steamKey', key.trim());
+      if (!isDemo) store.setSecret('steamKey', key);
       store.flush();
       return profile;
     }),
@@ -167,26 +186,24 @@ function registerIpc() {
   ipcMain.handle('account:disconnect', () =>
     toResult(async () => {
       store.resetAccount();
-      details.clear();
       return null;
     }),
   );
 
   ipcMain.handle('library:get', (_e, refresh: boolean) =>
     toResult(async () => {
-      const key = steamKey();
       const g = store.data.games;
-      if (refresh || !g || Date.now() - g.fetchedAt > LIBRARY_TTL) {
-        try {
-          const list = await provider.ownedGames(store.data.profile!.steamid, key);
-          store.data.games = { fetchedAt: Date.now(), list };
-          store.save();
-        } catch (e) {
-          // Bez sieci pokazujemy ostatnią znaną bibliotekę
-          if (!(g && e instanceof AppError && e.code === 'NETWORK')) throw e;
-        }
+      if (!refresh && g && Date.now() - g.fetchedAt < LIBRARY_TTL) return library();
+      try {
+        const list = await provider.ownedGames(store.data.profile!.steamid, steamKey());
+        store.data.games = { fetchedAt: Date.now(), list };
+        store.save();
+        return library();
+      } catch (e) {
+        const code = softCode(e);
+        if (g && code) return library(code);
+        throw e;
       }
-      return library();
     }),
   );
 
@@ -226,7 +243,6 @@ function registerIpc() {
       const profile = store.data.profile;
       store.clearCache();
       store.data.profile = profile;
-      details.clear();
       store.flush();
       return null;
     }),
@@ -259,9 +275,10 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     // Zrzut wymaga widocznego okna (ukryte daje UnknownVizError) — stawiamy je poza ekranem
-    if (shot) win?.setPosition(-20000, -20000);
-    if (shot) win?.showInactive();
-    else win?.show();
+    if (shot) {
+      win?.setPosition(-20000, -20000);
+      win?.showInactive();
+    } else win?.show();
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
     openSafe(url);
@@ -299,9 +316,9 @@ app.whenReady().then(async () => {
   store = new Store();
   // Demo do zrzutów ekranu: od razu "połączony" profil
   if (isDemo && process.env.AH_DEMO_CONNECTED === '1' && !store.data.profile) {
-    const profile = await demoProvider.resolveProfile('', '');
-    store.data.profile = profile;
-    store.data.games = { fetchedAt: Date.now(), list: await demoProvider.ownedGames('', '') };
+    store.data.profile = await demoProvider.resolveProfile('', null);
+    store.data.games = { fetchedAt: Date.now(), list: await demoProvider.ownedGames('', null) };
+    store.flush();
   }
   registerIpc();
   createWindow();

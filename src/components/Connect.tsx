@@ -4,7 +4,7 @@ import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
 import { Mark, Spinner } from './ui';
 
-export function Connect({ onConnected, demo }: { onConnected: (p: Profile) => void; demo: boolean }) {
+export function Connect({ onConnected, demo, needsKey }: { onConnected: (p: Profile) => void; demo: boolean; needsKey: boolean }) {
   const t = useT();
   const [profile, setProfile] = useState('');
   const [key, setKey] = useState('');
@@ -16,13 +16,13 @@ export function Connect({ onConnected, demo }: { onConnected: (p: Profile) => vo
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const r = await api.connect(profile, key);
+    const r = await api.connect(profile, needsKey ? key : undefined);
     setBusy(false);
     if (r.ok) onConnected(r.data);
     else setError(t(errorKey(r.code)));
   }
 
-  const ready = demo || (profile.trim().length > 1 && key.trim().length > 0);
+  const ready = demo || (profile.trim().length > 1 && (!needsKey || key.trim().length > 0));
 
   return (
     <div className="connect">
@@ -67,6 +67,7 @@ export function Connect({ onConnected, demo }: { onConnected: (p: Profile) => vo
           <span className="field-hint">{t('connect.step1.hint')}</span>
         </label>
 
+        {needsKey && (
         <label className="field">
           <span className="field-num">02</span>
           <span className="field-label">{t('connect.step2')}</span>
@@ -90,6 +91,7 @@ export function Connect({ onConnected, demo }: { onConnected: (p: Profile) => vo
             </button>
           </span>
         </label>
+        )}
 
         {error && <p className="form-error">{error}</p>}
 

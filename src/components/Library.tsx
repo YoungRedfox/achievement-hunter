@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from 'react';
-import type { LibraryGame } from '../../shared/types';
-import { useT } from '../i18n';
-import { pct } from '../lib';
+import type { Library as LibraryData, LibraryGame } from '../../shared/types';
+import { errorKey, useLang, useT } from '../i18n';
+import { fmtDate, pct } from '../lib';
 import { Icon, SteamArt } from './ui';
 
 export type Filter = 'progress' | 'untouched' | 'perfect' | 'all';
@@ -28,18 +28,22 @@ function left(g: LibraryGame) {
 }
 
 export function Library({
-  games,
+  lib,
   onOpen,
+  onRefresh,
   filter,
   setFilter,
 }: {
-  games: LibraryGame[];
+  lib: LibraryData;
   onOpen: (appid: number) => void;
+  onRefresh: () => void;
   filter: Filter;
   setFilter: (f: Filter) => void;
 }) {
   const t = useT();
-  const [sort, setSort] = useState<Sort>('closest');
+  const lang = useLang();
+  const games = lib.games;
+  const [sort, setSort] = useState<Sort>('recent');
   const [q, setQ] = useState('');
 
   const stats = useMemo(() => {
@@ -92,9 +96,15 @@ export function Library({
         </dl>
       </header>
 
+      {lib.stale && (
+        <p className="stale">
+          {t(errorKey(lib.stale))} {t('stale.saved', { d: fmtDate(lib.fetchedAt, lang) })}
+        </p>
+      )}
+
       <div className="toolbar">
         <div className="tabs" role="tablist">
-          {(['progress', 'untouched', 'perfect', 'all'] as const).map((f) => (
+          {(['all', 'progress', 'untouched', 'perfect'] as const).map((f) => (
             <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
               {t(`filter.${f}`)}
               <span className="count">{counts[f]}</span>
@@ -102,6 +112,10 @@ export function Library({
           ))}
         </div>
         <div className="toolbar-right">
+          <span className="saved-at">{t('library.saved', { d: fmtDate(lib.fetchedAt, lang) })}</span>
+          <button className="icon-btn" title={t('library.refresh')} onClick={onRefresh}>
+            <Icon.Refresh />
+          </button>
           <label className="search">
             <Icon.Search />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('search.placeholder')} spellCheck={false} />
@@ -147,9 +161,7 @@ const GameCard = memo(function GameCard({ game, onOpen }: { game: LibraryGame; o
         {!game.hasStats || (s && s.total === 0) ? (
           <p className="card-meta dim">{t('library.noAch')}</p>
         ) : !s ? (
-          <div className="card-meta">
-            <span className="skeleton" style={{ width: 56 }} />
-          </div>
+          <p className="card-meta dim">{t('library.unchecked')}</p>
         ) : (
           <>
             <p className="card-meta">

@@ -76,8 +76,11 @@ export function SettingsView({
 
       <section className="setting">
         <div className="setting-label">
-          <h2>{t('settings.steamKey')}</h2>
-          <p>{t('settings.steamKey.hint')}</p>
+          <h2>{settings.proxyAvailable ? t('settings.steamKey.optional') : t('settings.steamKey')}</h2>
+          <p>{settings.proxyAvailable && !settings.hasSteamKey ? t('settings.steamKey.optionalHint') : t('settings.steamKey.hint')}</p>
+          <button className="link" onClick={() => api.openExternal('https://steamcommunity.com/dev/apikey')}>
+            {t('connect.getKey')} ↗
+          </button>
         </div>
         <div className="setting-body">
           <div className="input-row">
@@ -86,7 +89,7 @@ export function SettingsView({
               type="password"
               value={steamKey}
               onChange={(e) => setSteamKey(e.target.value)}
-              placeholder={settings.hasSteamKey ? '•••••••••••••••• ' + t('settings.keySet') : t('settings.keyMissing')}
+              placeholder={settings.hasSteamKey ? '•••••••••••••••• ' + t('settings.keySet') : 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'}
             />
             <button
               className="ghost"
@@ -96,6 +99,11 @@ export function SettingsView({
               {busy === 'steam' ? <Spinner /> : t('settings.save')}
             </button>
           </div>
+          {settings.proxyAvailable && settings.hasSteamKey && (
+            <button className="link danger" onClick={() => save('steam', { steamKey: null })}>
+              {t('settings.steamKey.remove')}
+            </button>
+          )}
           {note('steam')}
         </div>
       </section>

@@ -46,6 +46,15 @@ export interface GameDetail {
   name: string;
   achievements: Achievement[];
   fetchedAt: number;
+  lang: Lang;
+  /** ustawione, gdy pokazujemy zapisane dane, bo świeżych nie dało się pobrać */
+  stale?: ErrorCode;
+}
+
+export interface Library {
+  games: LibraryGame[];
+  fetchedAt: number;
+  stale?: ErrorCode;
 }
 
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'very_hard';
@@ -76,11 +85,13 @@ export interface Settings {
   openAiModel: string;
   profile: Profile | null;
   demo: boolean;
+  /** czy działa nasz serwer z kluczem — wtedy użytkownik wkleja tylko link */
+  proxyAvailable: boolean;
 }
 
 export interface SettingsPatch {
   lang?: Lang;
-  steamKey?: string;
+  steamKey?: string | null;
   openAiKey?: string | null;
   openAiModel?: string;
 }
@@ -93,6 +104,8 @@ export type ErrorCode =
   | 'PRIVATE_GAMES'
   | 'NO_STATS'
   | 'RATE_LIMIT'
+  | 'DAILY_LIMIT'
+  | 'SERVICE_DOWN'
   | 'NETWORK'
   | 'NOT_CONNECTED'
   | 'NO_OPENAI_KEY'
@@ -107,14 +120,15 @@ export interface ScanProgress {
   done: number;
   total: number;
   running: boolean;
+  error?: ErrorCode;
 }
 
 export interface Api {
   getSettings(): Promise<Result<Settings>>;
   updateSettings(patch: SettingsPatch): Promise<Result<Settings>>;
-  connect(profileInput: string, steamKey: string): Promise<Result<Profile>>;
+  connect(profileInput: string, steamKey?: string): Promise<Result<Profile>>;
   disconnect(): Promise<Result<null>>;
-  getLibrary(refresh: boolean): Promise<Result<LibraryGame[]>>;
+  getLibrary(refresh: boolean): Promise<Result<Library>>;
   startScan(force: boolean): Promise<Result<null>>;
   getGame(appid: number, refresh: boolean): Promise<Result<GameDetail>>;
   getGuide(appid: number, apiname: string, refresh: boolean): Promise<Result<Guide>>;

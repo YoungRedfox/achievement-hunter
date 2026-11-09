@@ -42,3 +42,13 @@ export function searchLinks(gameName: string, achName: string, appid: number) {
     web: `https://www.google.com/search?q=${q}`,
   };
 }
+
+export function fmtDate(ts: number, lang: 'pl' | 'en') {
+  const d = new Date(ts);
+  const loc = lang === 'pl' ? 'pl-PL' : 'en-GB';
+  const today = new Date().toDateString() === d.toDateString();
+  // Dzisiejsze dane pokazujemy samą godziną — tak szybciej widać, że są świeże
+  return today
+    ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+}

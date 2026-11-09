@@ -1,5 +1,11 @@
 import type { Achievement, Guide, Lang } from '../shared/types';
+import { AppError } from './errors';
 import type { Provider } from './provider';
+
+// AH_DEMO_LIMIT=1 udaje wyczerpany dzienny limit — do sprawdzenia komunikatu
+const limit = () => {
+  if (process.env.AH_DEMO_LIMIT === '1') throw new AppError('DAILY_LIMIT');
+};
 
 // Tryb demo (AH_DEMO=1): przykładowe dane do oglądania interfejsu bez klucza Steam
 const GAMES: [number, string, number, number][] = [
@@ -56,6 +62,7 @@ export const demoProvider: Provider = {
     return { steamid: '76561190000000000', name: 'Lis', avatar: '', profileUrl: 'https://steamcommunity.com/' };
   },
   async ownedGames() {
+    limit();
     return GAMES.map(([appid, name, playtimeMinutes, count], i) => ({
       appid,
       name,
@@ -65,14 +72,17 @@ export const demoProvider: Provider = {
     }));
   },
   async achievementSummary(appid) {
+    limit();
     await new Promise((r) => setTimeout(r, 120));
     const g = GAMES.find((x) => x[0] === appid)!;
     const list = achievementsFor(appid, g[3], g[2]);
     return { total: list.length, achieved: list.filter((a) => a.achieved).length };
   },
-  async gameDetail(appid, name) {
+  async gameDetail(appid, name, _steamid, _key, lang) {
+    limit();
+    await new Promise((r) => setTimeout(r, 300));
     const g = GAMES.find((x) => x[0] === appid)!;
-    return { appid, name, achievements: achievementsFor(appid, g[3], g[2]), fetchedAt: Date.now() };
+    return { appid, name, achievements: achievementsFor(appid, g[3], g[2]), fetchedAt: Date.now(), lang };
   },
 };
 

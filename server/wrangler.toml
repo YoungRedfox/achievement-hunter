@@ -1,0 +1,6 @@
+name = "achievement-hunter-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# Klucz Steam NIE trafia do repo. Ustawiasz go raz:
+#   npx wrangler secret put STEAM_KEY

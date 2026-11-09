@@ -1,7 +1,7 @@
 import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AchSummary, Guide, Lang, OwnedGame, Profile } from '../shared/types';
+import type { AchSummary, GameDetail, Guide, Lang, OwnedGame, Profile } from '../shared/types';
 import { AppError } from './errors';
 
 export interface StoreData {
@@ -11,6 +11,8 @@ export interface StoreData {
   profile: Profile | null;
   games: { fetchedAt: number; list: OwnedGame[] } | null;
   summaries: Record<string, AchSummary>;
+  /** pełne listy osiągnięć otwieranych gier — kolejne otwarcie nie pobiera ich od nowa */
+  details: Record<string, GameDetail>;
   guides: Record<string, Guide>;
 }
 
@@ -51,6 +53,7 @@ export class Store {
       profile: null,
       games: null,
       summaries: {},
+      details: {},
       guides: {},
     };
     this.data = { ...defaults, ...(readJson<Partial<StoreData>>(this.file) ?? {}) };
@@ -92,6 +95,7 @@ export class Store {
   clearCache() {
     this.data.games = null;
     this.data.summaries = {};
+    this.data.details = {};
     this.data.guides = {};
     this.flush();
   }
