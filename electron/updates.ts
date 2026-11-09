@@ -2,10 +2,10 @@ import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { UpdateCheck, UpdateStatus } from '../shared/types';
 
-// Aktualizacje: przy starcie, co godzinę i przy powrocie do okna (najwyżej raz na 30 min).
-// Wcześniej było co 6 h — wydanie opublikowane chwilę po starcie aplikacji czekało do wieczora.
-const CHECK_EVERY = 3600_000;
-const FOCUS_GAP = 30 * 60_000;
+// Aktualizacje: przy starcie, co 10 min w tle i przy powrocie do okna (najwyżej raz na 3 min).
+// Sprawdzenie to jeden mały plik latest.yml z GitHuba — nie zużywa limitów Steam ani naszego serwera.
+const CHECK_EVERY = 10 * 60_000;
+const FOCUS_GAP = 3 * 60_000;
 
 let status: UpdateStatus = { state: 'idle' };
 let notify: (s: UpdateStatus) => void = () => {};
