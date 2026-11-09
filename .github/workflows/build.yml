@@ -1,0 +1,45 @@
+# Budowa instalatora w chmurze (Windows). Lokalnie blokuje ją Smart App Control.
+# Uruchamia się na tagu v* (wydanie) albo ręcznie z zakładki Actions.
+# Gotowe pliki (exe, blockmap, latest.yml) trafiają do artefaktu "installer";
+# scripts/release.mjs pobiera je i publikuje w publicznym repo achievement-hunter-releases.
+name: build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Build installer
+        run: npm run dist
+        env:
+          # electron-builder nie publikuje sam — robi to skrypt wydania
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+          if-no-files-found: error
+          retention-days: 14
