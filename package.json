@@ -14,7 +14,7 @@
     "test": "node --test tests/*.test.ts",
     "icon": "electron scripts/make-icon.cjs",
     "build": "tsc --noEmit && vite build && node scripts/build-main.mjs",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run build && electron-builder --win nsis --publish never"
   },
   "build": {
     "appId": "com.achievementhunter.app",
@@ -50,7 +50,15 @@
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true
     },
-    "copyright": "Copyright © 2026 YoungRedfox. Wszelkie prawa zastrzeżone."
+    "copyright": "Copyright © 2026 YoungRedfox. Wszelkie prawa zastrzeżone.",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "YoungRedfox",
+        "repo": "achievement-hunter-releases",
+        "releaseType": "release"
+      }
+    ]
   },
   "devDependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -62,6 +70,7 @@
     "@vitejs/plugin-react": "^6.2.1",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
+    "electron-updater": "^6.8.11",
     "esbuild": "^0.28.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

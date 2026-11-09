@@ -8,6 +8,7 @@ import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide } from '../shar
 import type { SteamKey } from './provider';
 import { proxyGuide, proxyUrl, steamProvider } from './steam';
 import { Store } from './store';
+import { downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
 // Przełączniki deweloperskie (demo, zrzuty) nie działają w zainstalowanej aplikacji
 const dev = !app.isPackaged;
@@ -290,6 +291,9 @@ function registerIpc() {
   );
 
   ipcMain.handle('open:external', (_e, url: string) => openSafe(url));
+  ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('update:status', () => getUpdateStatus());
+  ipcMain.handle('update:download', () => downloadUpdate(isDemo && process.env.AH_DEMO_UPDATE === '1').catch((e) => console.warn(e)));
 }
 
 function createWindow() {
@@ -370,6 +374,8 @@ app.whenReady().then(async () => {
   }
   registerIpc();
   createWindow();
+  // Aktualizacje tylko w zainstalowanej wersji (w dev nie ma czego aktualizować)
+  setupUpdates((s) => send('update:status', s), !dev, isDemo && process.env.AH_DEMO_UPDATE === '1');
 });
 
 app.on('before-quit', () => store?.flush());

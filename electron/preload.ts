@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AchSummary, Api, ScanProgress } from '../shared/types';
+import type { AchSummary, Api, ScanProgress, UpdateStatus } from '../shared/types';
 
 // Interfejs dostaje tylko te funkcje — żadnego dostępu do Node ani do kluczy
 const api: Api = {
@@ -17,6 +17,14 @@ const api: Api = {
     const h = (_: unknown, p: ScanProgress) => cb(p);
     ipcRenderer.on('scan:progress', h);
     return () => ipcRenderer.off('scan:progress', h);
+  },
+  getUpdateStatus: () => ipcRenderer.invoke('update:status'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  appVersion: () => ipcRenderer.invoke('app:version'),
+  onUpdateStatus: (cb) => {
+    const h = (_: unknown, s: UpdateStatus) => cb(s);
+    ipcRenderer.on('update:status', h);
+    return () => ipcRenderer.off('update:status', h);
   },
   onSummary: (cb) => {
     const h = (_: unknown, appid: number, s: AchSummary) => cb(appid, s);

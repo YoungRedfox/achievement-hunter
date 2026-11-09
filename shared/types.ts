@@ -127,6 +127,12 @@ export interface ScanProgress {
   error?: ErrorCode;
 }
 
+export interface UpdateStatus {
+  state: 'idle' | 'available' | 'downloading' | 'installing' | 'error';
+  version?: string;
+  percent?: number;
+}
+
 export interface Api {
   getSettings(): Promise<Result<Settings>>;
   updateSettings(patch: SettingsPatch): Promise<Result<Settings>>;
@@ -140,4 +146,8 @@ export interface Api {
   openExternal(url: string): Promise<void>;
   onScanProgress(cb: (p: ScanProgress) => void): () => void;
   onSummary(cb: (appid: number, s: AchSummary) => void): () => void;
+  getUpdateStatus(): Promise<UpdateStatus>;
+  downloadUpdate(): Promise<void>;
+  onUpdateStatus(cb: (s: UpdateStatus) => void): () => void;
+  appVersion(): Promise<string>;
 }

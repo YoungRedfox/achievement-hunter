@@ -4,6 +4,7 @@ import { Connect } from './components/Connect';
 import { GameView } from './components/GameView';
 import { Library, type Filter } from './components/Library';
 import { SettingsView } from './components/SettingsView';
+import { UpdateBar } from './components/UpdateBar';
 import { Icon, Mark } from './components/ui';
 import { LangContext, errorKey, makeT } from './i18n';
 import { api } from './lib';
@@ -107,6 +108,7 @@ export function App() {
           </nav>
 
           <div className="sidebar-foot">
+            <UpdateBar />
             {lib && withStats.length > 0 && (
               <div className={`scan ${scan.running ? 'running' : ''}`}>
                 {scan.running ? (
