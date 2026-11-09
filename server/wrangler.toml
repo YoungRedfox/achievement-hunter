@@ -1,15 +1,36 @@
 name = "achievement-hunter-api"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
 
-# 90 zapytań na minutę z jednego IP — aplikacja przy sprawdzaniu wszystkich gier trzyma się poniżej
+# Serwer nie zapisuje logów zapytań (adresy IP, SteamID)
+[observability]
+enabled = false
+
+# Dostawca AI dla poradników: "gemini" (darmowy próg) albo "openai".
+# Zmiana = edycja tej linii i `npx wrangler deploy`. AI_MODEL pusty = domyślny model dostawcy.
+[vars]
+AI_PROVIDER = "gemini"
+AI_MODEL = ""
+
+# 90 zapytań do Steam na minutę z jednego IP — aplikacja przy sprawdzaniu wszystkich gier trzyma się poniżej
 [[ratelimits]]
 name = "LIMITER"
 namespace_id = "1001"
 simple = { limit = 90, period = 60 }
 
-# Klucz Steam NIE trafia do repo. Ustawiasz go raz:
-#   npx wrangler secret put STEAM_KEY
+# 10 nowych poradników AI na minutę z jednego IP (gotowe z pamięci nie liczą się)
+[[ratelimits]]
+name = "GUIDE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 10, period = 60 }
 
-workers_dev = true
-preview_urls = false
+# Gotowe poradniki: gra + osiągnięcie + język. Bez danych o graczach.
+[[kv_namespaces]]
+binding = "GUIDES"
+id = "f7da9680e5ea4efe9c759554f3586787"
+
+# Klucze NIE trafiają do repo. Ustawiasz je raz:
+#   npx wrangler secret put STEAM_KEY
+#   npx wrangler secret put GEMINI_KEY    (albo OPENAI_KEY przy AI_PROVIDER = "openai")

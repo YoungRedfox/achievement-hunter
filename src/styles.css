@@ -1381,3 +1381,24 @@ select option {
 .tabs button {
   white-space: nowrap;
 }
+
+.privacy {
+  display: grid;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+.privacy li {
+  position: relative;
+  padding-left: 18px;
+}
+.privacy li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sage);
+}

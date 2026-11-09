@@ -1,10 +1,25 @@
 // Serwer pośredniczący (Cloudflare Worker): trzyma klucz Steam Web API, żeby użytkownik wklejał tylko link do profilu.
 // Przepuszcza wyłącznie odczyty z białej listy, dokleja klucz i nigdy go nie zwraca.
+// Generuje też poradniki AI naszym kluczem i zapisuje je per osiągnięcie (bez żadnych danych o graczu).
+import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide, type AiProvider } from '../../shared/guide-core.ts';
+
+type Limiter = { limit(opts: { key: string }): Promise<{ success: boolean }> };
+interface Kv {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
+}
 
 export interface Env {
   STEAM_KEY: string;
   /** Cloudflare Rate Limiting — limit zapytań na jeden adres IP */
-  LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  LIMITER?: Limiter;
+  GUIDE_LIMITER?: Limiter;
+  /** gotowe poradniki: klucz = gra + osiągnięcie + język */
+  GUIDES?: Kv;
+  AI_PROVIDER?: string;
+  AI_MODEL?: string;
+  GEMINI_KEY?: string;
+  OPENAI_KEY?: string;
 }
 
 interface Ctx {
@@ -39,6 +54,7 @@ export default {
     // Aplikacja woła z procesu Node (bez nagłówka Origin). Strony WWW nie mogą korzystać z naszego klucza.
     if (req.headers.get('origin')) return json({ error: 'FORBIDDEN' }, 403);
     if (url.pathname === '/health') return json({ ok: true });
+    if (url.pathname === '/guide') return guide(url, req, env, ctx);
     if (!url.pathname.startsWith('/steam/')) return json({ error: 'NOT_FOUND' }, 404);
 
     const path = url.pathname.slice('/steam'.length);
@@ -86,3 +102,67 @@ export default {
     return out;
   },
 };
+
+// ---- poradniki AI ----
+
+const GUIDE_TTL = 120 * 86_400; // poradnik żyje 120 dni, potem generuje się od nowa
+
+async function guide(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Response> {
+  const appid = url.searchParams.get('appid') ?? '';
+  const apiname = url.searchParams.get('apiname') ?? '';
+  const lang = url.searchParams.get('lang') ?? '';
+  if (!/^\d{1,10}$/.test(appid) || !/^[\w.:-]{1,128}$/.test(apiname) || (lang !== 'pl' && lang !== 'en')) {
+    return json({ error: 'BAD_REQUEST' }, 400);
+  }
+
+  const cacheKey = `g:${appid}:${apiname}:${lang}`;
+  const cached = await env.GUIDES?.get(cacheKey).catch(() => null);
+  if (cached) return new Response(cached, { headers: { 'content-type': 'application/json; charset=utf-8' } });
+
+  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (env.GUIDE_LIMITER && !(await env.GUIDE_LIMITER.limit({ key: ip })).success) return json({ error: 'TOO_FAST' }, 429);
+
+  const provider = (AI_PROVIDERS.includes(env.AI_PROVIDER as AiProvider) ? env.AI_PROVIDER : 'gemini') as AiProvider;
+  const apiKey = provider === 'gemini' ? env.GEMINI_KEY : env.OPENAI_KEY;
+  if (!apiKey) return json({ error: 'SERVICE_DOWN' }, 503);
+
+  // Nazwę i opis osiągnięcia bierzemy ze Steam, nie od klienta — nikt nie podrzuci fałszywego poradnika innym
+  const language = lang === 'pl' ? 'polish' : 'english';
+  let ach: any;
+  let gameName = `App ${appid}`;
+  try {
+    const [schema, store] = await Promise.all([
+      fetch(`https://api.steampowered.com/IPlayerService/GetGameAchievements/v1/?appid=${appid}&language=${language}`).then((r) => r.json()) as Promise<any>,
+      fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`)
+        .then((r) => r.json())
+        .catch(() => null) as Promise<any>,
+    ]);
+    ach = (schema?.response?.achievements ?? []).find((a: any) => a.internal_name === apiname);
+    gameName = store?.[appid]?.data?.name ?? gameName;
+  } catch {
+    return json({ error: 'UPSTREAM' }, 502);
+  }
+  if (!ach) return json({ error: 'NOT_FOUND' }, 404);
+
+  try {
+    const pct = parseFloat(ach.player_percent_unlocked);
+    const result = await generateGuide(provider, apiKey, env.AI_MODEL || DEFAULT_MODELS[provider], {
+      appid: Number(appid),
+      gameName,
+      name: ach.localized_name || apiname,
+      description: ach.localized_desc || '',
+      percent: Number.isFinite(pct) ? pct : null,
+      lang,
+    });
+    const body = JSON.stringify(result);
+    if (env.GUIDES) ctx.waitUntil(env.GUIDES.put(cacheKey, body, { expirationTtl: GUIDE_TTL }).catch(() => undefined));
+    return new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8' } });
+  } catch (e) {
+    const code = e instanceof GuideError ? e.code : 'AI_ERROR';
+    // Wyczerpany darmowy limit AI na dziś
+    if (code === 'AI_LIMIT') return json({ error: 'AI_LIMIT' }, 429);
+    // Nasz klucz AI odrzucony = awaria usługi, nie wina gracza
+    if (code === 'AI_INVALID_KEY') return json({ error: 'SERVICE_DOWN' }, 503);
+    return json({ error: 'AI_ERROR' }, 502);
+  }
+}

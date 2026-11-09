@@ -1,13 +1,16 @@
 import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { AiProvider } from '../shared/guide-core';
 import type { AchSummary, GameDetail, Guide, Lang, OwnedGame, Profile } from '../shared/types';
 import { AppError } from './errors';
 
 export interface StoreData {
   version: 1;
   lang: Lang;
-  openAiModel: string;
+  aiProvider: AiProvider;
+  /** pusty = domyślny model dostawcy */
+  aiModel: string;
   profile: Profile | null;
   games: { fetchedAt: number; list: OwnedGame[] } | null;
   summaries: Record<string, AchSummary>;
@@ -16,9 +19,7 @@ export interface StoreData {
   guides: Record<string, Guide>;
 }
 
-type SecretName = 'steamKey' | 'openAiKey';
-
-export const DEFAULT_MODEL = 'gpt-5-mini';
+type SecretName = 'steamKey' | 'aiKey';
 
 function readJson<T>(file: string): T | null {
   try {
@@ -62,7 +63,8 @@ export class Store {
     const defaults: StoreData = {
       version: 1,
       lang: app.getLocale().toLowerCase().startsWith('pl') ? 'pl' : 'en',
-      openAiModel: DEFAULT_MODEL,
+      aiProvider: 'gemini',
+      aiModel: '',
       profile: null,
       games: null,
       summaries: {},

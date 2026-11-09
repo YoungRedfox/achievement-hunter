@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import { DEFAULT_PROXY_URL } from '../shared/config';
-import type { Achievement, Lang, OwnedGame, Profile } from '../shared/types';
+import type { Achievement, Guide, Lang, OwnedGame, Profile } from '../shared/types';
 import { AppError, sleep } from './errors';
 import { isSteamKey, parseProfileInput } from './profile-input';
 import type { Provider, SteamKey } from './provider';
@@ -80,6 +80,27 @@ function open(path: string, params: Record<string, string | number>): Promise<Ra
   const url = new URL(API + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   return send(url, false);
+}
+
+/** Poradnik z naszego serwera — nasz klucz AI, wspólny zapis gotowych poradników. Wysyłamy tylko numer gry i osiągnięcia. */
+export async function proxyGuide(appid: number, apiname: string, lang: Lang): Promise<Guide> {
+  const proxy = proxyUrl();
+  if (!proxy) throw new AppError('NO_AI_KEY');
+  const url = new URL(`${proxy}/guide`);
+  url.searchParams.set('appid', String(appid));
+  url.searchParams.set('apiname', apiname);
+  url.searchParams.set('lang', lang);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+  } catch {
+    throw new AppError('NETWORK');
+  }
+  const body: any = await res.json().catch(() => null);
+  if (res.ok && body?.steps) return body as Guide;
+  if (res.status === 429) throw new AppError(body?.error === 'TOO_FAST' ? 'RATE_LIMIT' : 'AI_LIMIT');
+  if (res.status === 503) throw new AppError('SERVICE_DOWN');
+  throw new AppError('AI_ERROR', body?.error ?? `HTTP ${res.status}`);
 }
 
 function playerStatsError(body: any): AppError | null {

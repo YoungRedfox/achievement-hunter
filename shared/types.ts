@@ -81,8 +81,10 @@ export interface Guide {
 export interface Settings {
   lang: Lang;
   hasSteamKey: boolean;
-  hasOpenAiKey: boolean;
-  openAiModel: string;
+  /** własny klucz AI gracza (trzymany tylko lokalnie) */
+  hasAiKey: boolean;
+  aiProvider: 'gemini' | 'openai';
+  aiModel: string;
   profile: Profile | null;
   demo: boolean;
   /** czy działa nasz serwer z kluczem — wtedy użytkownik wkleja tylko link */
@@ -92,8 +94,9 @@ export interface Settings {
 export interface SettingsPatch {
   lang?: Lang;
   steamKey?: string | null;
-  openAiKey?: string | null;
-  openAiModel?: string;
+  aiKey?: string | null;
+  aiProvider?: 'gemini' | 'openai';
+  aiModel?: string;
 }
 
 export type ErrorCode =
@@ -108,10 +111,10 @@ export type ErrorCode =
   | 'SERVICE_DOWN'
   | 'NETWORK'
   | 'NOT_CONNECTED'
-  | 'NO_OPENAI_KEY'
-  | 'OPENAI_INVALID_KEY'
-  | 'OPENAI_QUOTA'
-  | 'OPENAI_ERROR'
+  | 'NO_AI_KEY'
+  | 'AI_INVALID_KEY'
+  | 'AI_LIMIT'
+  | 'AI_ERROR'
   | 'UNKNOWN';
 
 export type Result<T> = { ok: true; data: T } | { ok: false; code: ErrorCode; message?: string };

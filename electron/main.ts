@@ -4,10 +4,10 @@ import path from 'node:path';
 import type { ErrorCode, GameDetail, Library, ScanProgress, Settings, SettingsPatch } from '../shared/types';
 import { demoGuide, demoProvider } from './demo';
 import { AppError, sleep, toResult } from './errors';
-import { generateGuide } from './guide';
+import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide } from '../shared/guide-core';
 import type { SteamKey } from './provider';
-import { proxyUrl, steamProvider } from './steam';
-import { DEFAULT_MODEL, Store } from './store';
+import { proxyGuide, proxyUrl, steamProvider } from './steam';
+import { Store } from './store';
 
 // Przełączniki deweloperskie (demo, zrzuty) nie działają w zainstalowanej aplikacji
 const dev = !app.isPackaged;
@@ -54,8 +54,9 @@ function settings(): Settings {
   return {
     lang: store.data.lang,
     hasSteamKey: !!store.getSecret('steamKey'),
-    hasOpenAiKey: isDemo || !!store.getSecret('openAiKey'),
-    openAiModel: store.data.openAiModel,
+    hasAiKey: !!store.getSecret('aiKey'),
+    aiProvider: store.data.aiProvider,
+    aiModel: store.data.aiModel || DEFAULT_MODELS[store.data.aiProvider],
     profile: store.data.profile,
     demo: isDemo,
     proxyAvailable: proxyAvailable(),
@@ -161,8 +162,18 @@ function registerIpc() {
   ipcMain.handle('settings:update', (_e, patch: SettingsPatch) =>
     toResult(async () => {
       if (patch.lang) store.data.lang = patch.lang;
-      if (patch.openAiModel !== undefined) store.data.openAiModel = patch.openAiModel.trim() || DEFAULT_MODEL;
-      if (patch.openAiKey !== undefined) store.setSecret('openAiKey', patch.openAiKey?.trim() || null);
+      if (patch.aiProvider && AI_PROVIDERS.includes(patch.aiProvider) && patch.aiProvider !== store.data.aiProvider) {
+        // Inny dostawca = inny klucz i inny model
+        store.data.aiProvider = patch.aiProvider;
+        store.data.aiModel = '';
+        store.setSecret('aiKey', null);
+      }
+      if (patch.aiModel !== undefined) {
+        const m = patch.aiModel.trim();
+        store.data.aiModel = m === DEFAULT_MODELS[store.data.aiProvider] ? '' : m;
+      }
+      // Klucz AI zostaje wyłącznie na tym komputerze (zaszyfrowany), nigdy nie idzie na nasz serwer
+      if (patch.aiKey !== undefined) store.setSecret('aiKey', patch.aiKey?.trim() || null);
       if (patch.steamKey !== undefined) {
         const profile = store.data.profile;
         if (!profile) throw new AppError('NOT_CONNECTED');
@@ -236,12 +247,32 @@ function registerIpc() {
         await new Promise((r) => setTimeout(r, 1200));
         return demoGuide(lang);
       }
-      const apiKey = store.getSecret('openAiKey');
-      if (!apiKey) throw new AppError('NO_OPENAI_KEY');
-      const detail = await loadDetail(appid, false);
-      const achievement = detail.achievements.find((a) => a.apiname === apiname);
-      if (!achievement) throw new AppError('INVALID_INPUT');
-      const guide = await generateGuide({ apiKey, model: store.data.openAiModel, lang, appid, gameName: detail.name, achievement });
+      const ownKey = store.getSecret('aiKey');
+      let guide;
+      if (ownKey) {
+        // Własny klucz: prosto do dostawcy AI, z pominięciem naszego serwera
+        const detail = await loadDetail(appid, false);
+        const a = detail.achievements.find((x) => x.apiname === apiname);
+        if (!a) throw new AppError('INVALID_INPUT');
+        const provider = store.data.aiProvider;
+        try {
+          guide = await generateGuide(provider, ownKey, store.data.aiModel || DEFAULT_MODELS[provider], {
+            appid,
+            gameName: detail.name,
+            name: a.name,
+            description: a.description,
+            percent: a.percent,
+            lang,
+          });
+        } catch (e) {
+          if (e instanceof GuideError) throw new AppError(e.code, e.message);
+          throw e;
+        }
+      } else if (proxyAvailable()) {
+        guide = await proxyGuide(appid, apiname, lang);
+      } else {
+        throw new AppError('NO_AI_KEY');
+      }
       store.data.guides[cacheKey] = guide;
       store.flush();
       return guide;

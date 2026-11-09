@@ -56,11 +56,22 @@ export function Guide({
           <span className="scanline" />
           <p>{t('guide.loading')}</p>
         </div>
-      ) : error === 'NO_OPENAI_KEY' ? (
+      ) : error === 'NO_AI_KEY' ? (
         <div className="guide-nokey">
           <div>
             <p className="strong">{t('guide.noKey.title')}</p>
             <p className="dim">{t('guide.noKey.body')}</p>
+          </div>
+          <button className="ghost" onClick={onSettings}>
+            {t('guide.noKey.cta')}
+          </button>
+        </div>
+      ) : error === 'AI_LIMIT' ? (
+        // Darmowy limit na dziś — można poczekać do jutra albo dodać własny klucz
+        <div className="guide-nokey">
+          <div>
+            <p className="strong">{t('error.AI_LIMIT')}</p>
+            <p className="dim">{t('guide.limit.body')}</p>
           </div>
           <button className="ghost" onClick={onSettings}>
             {t('guide.noKey.cta')}

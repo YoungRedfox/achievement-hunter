@@ -4,6 +4,9 @@ import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
 import { Spinner } from './ui';
 
+const AI_NAMES = { gemini: 'Google Gemini', openai: 'OpenAI' } as const;
+const AI_KEY_PAGES = { gemini: 'https://aistudio.google.com/apikey', openai: 'https://platform.openai.com/api-keys' } as const;
+
 export function SettingsView({
   settings,
   onChange,
@@ -15,8 +18,8 @@ export function SettingsView({
 }) {
   const t = useT();
   const [steamKey, setSteamKey] = useState('');
-  const [openAiKey, setOpenAiKey] = useState('');
-  const [model, setModel] = useState(settings.openAiModel);
+  const [aiKey, setAiKey] = useState('');
+  const [model, setModel] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ section: string; text: string; error?: boolean } | null>(null);
 
@@ -110,44 +113,72 @@ export function SettingsView({
 
       <section className="setting">
         <div className="setting-label">
-          <h2>{t('settings.openai')}</h2>
-          <p>{t('settings.openai.hint')}</p>
-          <button className="link" onClick={() => api.openExternal('https://platform.openai.com/api-keys')}>
-            {t('settings.openai.getKey')} ↗
+          <h2>{settings.proxyAvailable ? t('settings.ai.optional') : t('settings.ai')}</h2>
+          <p>{settings.proxyAvailable ? t('settings.ai.hint') : t('settings.ai.hintNoServer')}</p>
+          <button className="link" onClick={() => api.openExternal(AI_KEY_PAGES[settings.aiProvider])}>
+            {t('settings.ai.getKey', { p: AI_NAMES[settings.aiProvider] })} ↗
           </button>
         </div>
         <div className="setting-body">
+          <div className="tabs">
+            {(['gemini', 'openai'] as const).map((p) => (
+              <button
+                key={p}
+                className={settings.aiProvider === p ? 'on' : ''}
+                onClick={() => {
+                  if (p === settings.aiProvider) return;
+                  if (settings.hasAiKey && !confirm(t('settings.ai.switch'))) return;
+                  void save('ai', { aiProvider: p }).then((ok) => ok && setModel(''));
+                }}
+              >
+                {AI_NAMES[p]}
+              </button>
+            ))}
+          </div>
           <div className="input-row">
             <input
               className="mono"
               type="password"
-              value={openAiKey}
-              onChange={(e) => setOpenAiKey(e.target.value)}
-              placeholder={settings.hasOpenAiKey ? '•••••••••••••••• ' + t('settings.keySet') : 'sk-…'}
+              value={aiKey}
+              onChange={(e) => setAiKey(e.target.value)}
+              placeholder={settings.hasAiKey ? '•••••••••••••••• ' + t('settings.keySet') : settings.aiProvider === 'openai' ? 'sk-…' : 'AIza…'}
             />
             <button
               className="ghost"
-              disabled={!openAiKey.trim() || busy === 'openai'}
-              onClick={async () => (await save('openai', { openAiKey })) && setOpenAiKey('')}
+              disabled={!aiKey.trim() || busy === 'ai'}
+              onClick={async () => (await save('ai', { aiKey })) && setAiKey('')}
             >
-              {busy === 'openai' ? <Spinner /> : t('settings.save')}
+              {busy === 'ai' ? <Spinner /> : t('settings.save')}
             </button>
           </div>
           <label className="inline-field">
             <span>{t('settings.openai.model')}</span>
             <input
               className="mono"
-              value={model}
+              value={model || settings.aiModel}
               onChange={(e) => setModel(e.target.value)}
-              onBlur={() => model !== settings.openAiModel && save('openai', { openAiModel: model })}
+              onBlur={() => model && model !== settings.aiModel && save('ai', { aiModel: model })}
             />
           </label>
-          {settings.hasOpenAiKey && (
-            <button className="link danger" onClick={() => save('openai', { openAiKey: null })}>
+          {settings.hasAiKey && (
+            <button className="link danger" onClick={() => save('ai', { aiKey: null })}>
               {t('settings.openai.remove')}
             </button>
           )}
-          {note('openai')}
+          {note('ai')}
+        </div>
+      </section>
+
+      <section className="setting">
+        <div className="setting-label">
+          <h2>{t('privacy.title')}</h2>
+        </div>
+        <div className="setting-body">
+          <ul className="privacy">
+            <li>{t('privacy.local')}</li>
+            <li>{t('privacy.server')}</li>
+            <li>{t('privacy.own')}</li>
+          </ul>
         </div>
       </section>
 
