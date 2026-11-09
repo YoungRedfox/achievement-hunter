@@ -63,7 +63,11 @@ Security notes for the curious: sandboxed renderer, strict CSP, no DevTools in r
 
 ## Legal
 
-[Privacy policy](PRIVACY.md) · [Terms of use](TERMS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Steam Web API terms](https://steamcommunity.com/dev/apiterms)
+[Code signing policy](CODE_SIGNING_POLICY.md) · [Privacy policy](PRIVACY.md) · [Terms of use](TERMS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Steam Web API terms](https://steamcommunity.com/dev/apiterms)
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). Details: [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
 ## License
 
