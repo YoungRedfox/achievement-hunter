@@ -2,10 +2,9 @@
   "name": "achievement-hunter",
   "productName": "Achievement Hunter",
   "version": "0.2.0",
-  "description": "Brakujące osiągnięcia Steam i sposoby, jak je zdobyć — bez logowania do Steam.",
+  "description": "Find the Steam achievements you are missing and learn how to unlock them, step by step. No Steam sign-in.",
   "author": "YoungRedfox",
-  "license": "SEE LICENSE IN LICENSE",
-  "private": true,
+  "license": "GPL-3.0-only",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -51,7 +50,7 @@
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true
     },
-    "copyright": "Copyright © 2026 YoungRedfox. Wszelkie prawa zastrzeżone.",
+    "copyright": "Copyright © 2026 YoungRedfox. Licensed under GPL-3.0.",
     "publish": [
       {
         "provider": "github",
@@ -77,5 +76,10 @@
     "react-dom": "^19.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.6"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YoungRedfox/achievement-hunter.git"
+  },
+  "homepage": "https://github.com/YoungRedfox/achievement-hunter"
 }

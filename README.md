@@ -1,52 +1,70 @@
-# Achievement Hunter
+<p align="center">
+  <img src="build/icon.png" width="96" alt="Achievement Hunter logo">
+</p>
 
-Aplikacja na Windows: pokazuje, których osiągnięć Steam jeszcze nie masz, i podpowiada krok po kroku, jak je zdobyć.
+<h1 align="center">Achievement Hunter</h1>
 
-- **Bez logowania do Steam.** Wklejasz link do profilu + własny, darmowy klucz Steam Web API.
-- Klucze szyfrowane przez Windows (DPAPI, `safeStorage`), nie opuszczają komputera poza zapytaniami do Steam/OpenAI.
-- Poradniki: OpenAI (Responses API + wyszukiwanie w sieci), zawsze z linkami do poradników Steam, YouTube i Google.
-- Interfejs PL / EN.
+<p align="center">
+  <b>You're 7 achievements away from 100%. Let's go get them.</b><br>
+  Paste your Steam profile link and see exactly what's missing in every game, plus how to unlock it.
+</p>
 
-## Wymagania użytkownika
+<p align="center">
+  <a href="https://github.com/YoungRedfox/achievement-hunter-releases/releases/latest"><b>Download for Windows</b></a>
+  &nbsp;·&nbsp; Free &nbsp;·&nbsp; Open source &nbsp;·&nbsp; No Steam login
+</p>
 
-1. Profil Steam publiczny, „Szczegóły gry” publiczne.
-2. Klucz: https://steamcommunity.com/dev/apikey (domena: `localhost`).
-3. Opcjonalnie klucz OpenAI do poradników w aplikacji.
+---
 
-## Praca nad kodem
+You know the feeling. Hollow Knight sits at 89%, there's one achievement nobody explains properly, and you've got six wiki tabs open. Achievement Hunter puts all of that in one place.
+
+**Paste a link, nothing else.** No Steam login, no password, no API key to hunt for. The app reads your public profile and lays out your whole library.
+
+**See what's left, easiest first.** Every missing achievement is sorted by how many players already have it, so you knock out the easy ones before the 0.8% monsters.
+
+**Get the actual steps.** Hit *How to get it* and you get a short, numbered walkthrough built from real guides, with a warning if it's missable, an estimate of how long it takes, and links to Steam guides and YouTube when you want more.
+
+**Pick the game yourself.** Nothing scans your 400-game backlog behind your back. Open the game you care about; everything you load is saved on your PC and only refreshed when you've actually played since.
+
+**Speaks your language.** English, Polski, Deutsch, Français, Español, Português (Brasil), Русский, 简体中文, 日本語 and 한국어. Achievement names and guides follow the language you pick.
+
+**Updates itself.** When a new version is out, you get one button: download and update.
+
+## Your data stays yours
+
+Your profile, keys and saved data live on your computer, encrypted by Windows. We never upload them.
+
+Our small server does two jobs: it passes public Steam requests along (your public SteamID) and writes guides from a game and achievement number. No accounts, no logs, nothing about you is stored.
+
+Want zero middlemen? Drop your own Steam Web API key or AI key (Gemini or OpenAI) into Settings and the app talks to them directly.
+
+The one requirement: your Steam profile and *Game details* need to be public.
+
+## Build it yourself
 
 ```bash
 npm install
-npm run dev     # aplikacja z prawdziwym Steam
-npm run demo    # przykładowe dane, bez klucza
+npm run demo      # the full UI with sample data
+npm run dev       # with your real Steam library
 npm test
-npm run dist    # instalator: release/AchievementHunter-Setup-<wersja>.exe
+npm run dist      # Windows installer in release/
 ```
 
-Zrzut ekranu ekranu w trybie demo (po `npm run build`):
-
-```bash
-AH_DEMO=1 AH_DEMO_CONNECTED=1 AH_SHOT=shots/library.png node_modules/electron/dist/electron.exe .
-```
-
-## Budowa
-
-| Katalog | Co |
+| Folder | What's inside |
 |---|---|
-| `electron/` | proces główny: Steam API (`steam.ts`), magazyn i szyfrowanie (`store.ts`), poradniki AI (`guide.ts`), tryb demo |
-| `src/` | interfejs React |
-| `shared/types.ts` | typy wspólne i kontrakt IPC |
+| `electron/` | main process: Steam client, encrypted storage, updates |
+| `src/` | the React UI and translations (`src/locales/`) |
+| `shared/` | types and the guide generator shared with the server |
+| `server/` | Cloudflare Worker holding the Steam and AI keys |
 
-## Przed publikacją
+Running your own fork? Point `DEFAULT_PROXY_URL` in `shared/config.ts` at your own server.
 
-- Podpis kodu (certyfikat Authenticode) — bez niego Windows SmartScreen ostrzega przy instalacji.
-- Automatyczne aktualizacje (electron-updater + GitHub Releases).
+Security notes for the curious: sandboxed renderer, strict CSP, no DevTools in releases, Electron fuses locked down (no RunAsNode, ASAR integrity checks), and a server that only accepts a short allow-list of Steam endpoints with per-IP rate limits. Releases are built on GitHub Actions; see [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
-## Zabezpieczenia
+## License
 
-- Klucz Steam tylko na serwerze (sekret Cloudflare); nigdy w exe ani w repo.
-- Serwer: biała lista zapytań i parametrów, limit 90 zapytań/min na IP, blokada wywołań ze stron WWW.
-- Dane i klucze na dysku szyfrowane przez Windows DPAPI (`data.bin`, `secrets.json`).
-- Electron: sandbox, contextIsolation, CSP, brak DevTools i menu w wersji wydanej, odmowa wszystkich uprawnień.
-- Electron fuses: wyłączony tryb Node (`ELECTRON_RUN_AS_NODE`), `NODE_OPTIONS`, `--inspect`; sprawdzanie integralności `app.asar`.
-- Licencja: wszelkie prawa zastrzeżone (`LICENSE`).
+[GPL-3.0](LICENSE) © 2026 YoungRedfox. Use it, learn from it, change it. If you ship a modified version, keep it open source too.
+
+The Achievement Hunter name and logo aren't part of the code license, see [TRADEMARK.md](TRADEMARK.md).
+
+Steam and the Steam logo are trademarks of Valve Corporation. Achievement Hunter isn't affiliated with or endorsed by Valve.
