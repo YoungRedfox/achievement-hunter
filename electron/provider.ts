@@ -7,6 +7,7 @@ export type SteamKey = string | null;
 export interface Provider {
   resolveProfile(input: string, key: SteamKey): Promise<Profile>;
   ownedGames(steamid: string, key: SteamKey): Promise<OwnedGame[]>;
-  achievementSummary(appid: number, steamid: string, key: SteamKey): Promise<{ total: number; achieved: number }>;
+  /** Postęp wielu gier jednym zapytaniem (do 100 naraz). */
+  progress(appids: number[], steamid: string, key: SteamKey): Promise<{ appid: number; total: number; achieved: number }[]>;
   gameDetail(appid: number, name: string, steamid: string, key: SteamKey, lang: Lang): Promise<GameDetail>;
 }

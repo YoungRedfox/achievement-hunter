@@ -4,6 +4,7 @@ export const ru: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Библиотека',
   'nav.settings': 'Настройки',
+  'nav.installed': 'Установленные',
 
   'connect.lang': 'Язык',
   'connect.eyebrow': 'Без входа и без ключей',
@@ -47,7 +48,7 @@ export const ru: Dict = {
   'library.refresh': 'Обновить',
   'library.saved': 'Список игр от {d}',
   'library.unchecked': 'откройте для проверки',
-  'scan.running': 'Проверяем достижения',
+  'scan.running': 'Загружаем прогресс',
   'scan.checked': 'Проверено {n} из {total}',
   'scan.rest': 'Проверить остальные',
   'scan.confirm': 'Проверить {n} игр разом? Это займёт около {m} мин и израсходует часть дневного лимита. Можно открывать игры и по одной.',

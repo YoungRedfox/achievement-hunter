@@ -4,6 +4,7 @@ export const zhCN: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': '游戏库',
   'nav.settings': '设置',
+  'nav.installed': '已安装',
 
   'connect.lang': '语言',
   'connect.eyebrow': '无需登录，无需密钥',
@@ -47,7 +48,7 @@ export const zhCN: Dict = {
   'library.refresh': '刷新',
   'library.saved': '游戏列表更新于 {d}',
   'library.unchecked': '打开以检查',
-  'scan.running': '正在检查成就',
+  'scan.running': '正在载入进度',
   'scan.checked': '已检查 {n}/{total}',
   'scan.rest': '检查剩余游戏',
   'scan.confirm': '一次检查 {n} 款游戏？大约需要 {m} 分钟，并会占用部分每日额度。你也可以逐个打开游戏。',

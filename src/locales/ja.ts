@@ -4,6 +4,7 @@ export const ja: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'ライブラリ',
   'nav.settings': '設定',
+  'nav.installed': 'インストール済み',
 
   'connect.lang': '言語',
   'connect.eyebrow': 'ログイン不要・キー不要',
@@ -47,7 +48,7 @@ export const ja: Dict = {
   'library.refresh': '更新',
   'library.saved': 'ゲーム一覧: {d}',
   'library.unchecked': '開いて確認',
-  'scan.running': '実績を確認中',
+  'scan.running': '進捗を読み込み中',
   'scan.checked': '{total} 本中 {n} 本を確認済み',
   'scan.rest': '残りを確認',
   'scan.confirm': '{n} 本のゲームをまとめて確認しますか？約 {m} 分かかり、1 日の上限の一部を使います。ゲームを 1 本ずつ開くこともできます。',

@@ -71,12 +71,14 @@ export const demoProvider: Provider = {
       hasStats: count > 0,
     }));
   },
-  async achievementSummary(appid) {
+  async progress(appids) {
     limit();
-    await new Promise((r) => setTimeout(r, 120));
-    const g = GAMES.find((x) => x[0] === appid)!;
-    const list = achievementsFor(appid, g[3], g[2]);
-    return { total: list.length, achieved: list.filter((a) => a.achieved).length };
+    await new Promise((r) => setTimeout(r, 600));
+    return appids.map((appid) => {
+      const g = GAMES.find((x) => x[0] === appid)!;
+      const list = achievementsFor(appid, g[3], g[2]);
+      return { appid, total: list.length, achieved: list.filter((a) => a.achieved).length };
+    });
   },
   async gameDetail(appid, name, _steamid, _key, lang) {
     limit();

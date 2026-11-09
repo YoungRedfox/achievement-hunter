@@ -4,6 +4,7 @@ export const de: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Bibliothek',
   'nav.settings': 'Einstellungen',
+  'nav.installed': 'Installiert',
 
   'connect.lang': 'Sprache',
   'connect.eyebrow': 'Ohne Anmeldung, ohne Schlüssel',
@@ -47,7 +48,7 @@ export const de: Dict = {
   'library.refresh': 'Aktualisieren',
   'library.saved': 'Spieleliste vom {d}',
   'library.unchecked': 'zum Prüfen öffnen',
-  'scan.running': 'Errungenschaften werden geprüft',
+  'scan.running': 'Fortschritt wird geladen',
   'scan.checked': '{n} von {total} geprüft',
   'scan.rest': 'Rest prüfen',
   'scan.confirm': '{n} Spiele auf einmal prüfen? Das dauert etwa {m} Min. und verbraucht einen Teil des Tageslimits. Du kannst Spiele auch einzeln öffnen.',

@@ -63,3 +63,16 @@ test('never leaks the key in responses', async () => {
   const res = await get(`/steam/ISteamUser/ResolveVanityURL/v1/?vanityurl=robinwalker`);
   assert.doesNotMatch(await res.text(), /SECRETKEY/);
 });
+
+test('progress batches many games into one Steam call and returns counts only', async () => {
+  const calls = mockSteam(
+    200,
+    JSON.stringify({ response: { games: [{ appid: 440, total_achievements: 520, achievements: [{ name: 'a' }, { name: 'b' }] }, { appid: 400, total_achievements: 15 }] } }),
+  );
+  const res = await get(`/progress?steamid=${SID}&appids=440,400`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { games: [{ appid: 440, total: 520, achieved: 2 }, { appid: 400, total: 15, achieved: 0 }] });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /appids%5B1%5D=400/);
+  assert.equal((await get(`/progress?steamid=${SID}&appids=${Array.from({ length: 101 }, (_, i) => i + 1).join(',')}`)).status, 400);
+});

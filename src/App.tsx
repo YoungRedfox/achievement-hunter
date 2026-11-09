@@ -29,6 +29,7 @@ export function App() {
   const [scan, setScan] = useState<ScanProgress>({ done: 0, total: 0, running: false });
   // Domyślnie wszystkie gry — gracz sam wybiera, którą sprawdzić
   const [filter, setFilter] = useState<Filter>('all');
+  const [installed, setInstalled] = useState<{ appid: number; name: string }[]>([]);
 
   const t = useMemo(() => makeT(settings?.lang ?? 'en'), [settings?.lang]);
   // Atrybut lang wybiera właściwe kroje dla chińskiego, japońskiego i koreańskiego
@@ -43,7 +44,11 @@ export function App() {
       document.querySelector('.main')?.scrollTo({ top: 0 });
     };
     window.addEventListener('hashchange', onHash);
-    const offProgress = api.onScanProgress(setScan);
+    // Po zakończeniu pobierania czytamy bibliotekę z zapisu (lokalnie) — pewniej niż same zdarzenia
+    const offProgress = api.onScanProgress((p) => {
+      setScan(p);
+      if (!p.running && !p.error) api.getLibrary(false).then((r) => r.ok && setLib(r.data));
+    });
     // Wynik każdej sprawdzonej gry od razu trafia na jej kartę
     const offSummary = api.onSummary((appid, s) =>
       setLib((prev) => prev && { ...prev, games: prev.games.map((g) => (g.appid === appid ? { ...g, summary: s } : g)) }),
@@ -60,11 +65,17 @@ export function App() {
     const r = await api.getLibrary(refresh);
     if (r.ok) setLib(r.data);
     else setLibError(r.code);
+    if (r.ok && refresh) {
+      void api.startScan(true);
+      api.installedGames().then(setInstalled);
+    }
   }, []);
 
   const connected = !!settings?.profile;
   useEffect(() => {
-    if (connected) void loadLibrary(false);
+    if (!connected) return;
+    void loadLibrary(false);
+    api.installedGames().then(setInstalled);
   }, [connected, loadLibrary]);
 
   if (!settings) return <div className="boot" />;
@@ -86,14 +97,12 @@ export function App() {
   }
 
   const p = settings.profile;
-  const withStats = lib?.games.filter((g) => g.hasStats) ?? [];
-  const checked = withStats.filter((g) => g.summary).length;
-  const rest = withStats.length - checked;
-
-  function checkRest() {
-    const minutes = Math.max(1, Math.round(rest / 75));
-    if (confirm(t('scan.confirm', { n: rest, m: minutes }))) void api.startScan(false);
-  }
+  const byId = new Map(lib?.games.map((g) => [g.appid, g]) ?? []);
+  // Zainstalowane: najpierw ostatnio grane, nazwa z biblioteki (ładniejsza niż z manifestu)
+  const installedList = installed
+    .map((i) => ({ ...i, game: byId.get(i.appid) }))
+    .map((i) => ({ ...i, name: i.game?.name || i.name || `App ${i.appid}` }))
+    .sort((a, b) => (b.game?.lastPlayed ?? 0) - (a.game?.lastPlayed ?? 0) || a.name.localeCompare(b.name));
 
   return (
     <LangContext.Provider value={ctx}>
@@ -105,7 +114,7 @@ export function App() {
             <span>{t('app.name')}</span>
           </div>
           <nav>
-            <button className={route.name !== 'settings' ? 'on' : ''} onClick={() => go({ name: 'library' })}>
+            <button className={route.name === 'library' ? 'on' : ''} onClick={() => go({ name: 'library' })}>
               <Icon.Library /> {t('nav.library')}
             </button>
             <button className={route.name === 'settings' ? 'on' : ''} onClick={() => go({ name: 'settings' })}>
@@ -113,11 +122,37 @@ export function App() {
             </button>
           </nav>
 
+          {installedList.length > 0 && (
+            <div className="installed">
+              <p className="installed-head small-caps">
+                {t('nav.installed')} <span className="mono">{installedList.length}</span>
+              </p>
+              <ul>
+                {installedList.map((g) => {
+                  const s = g.game?.summary;
+                  const pctv = s && s.total > 0 ? Math.floor((s.achieved / s.total) * 100) : null;
+                  return (
+                    <li key={g.appid}>
+                      <button
+                        className={route.name === 'game' && route.appid === g.appid ? 'on' : ''}
+                        onClick={() => go({ name: 'game', appid: g.appid })}
+                        title={g.name}
+                      >
+                        <span className="installed-name">{g.name}</span>
+                        {pctv !== null && <span className={`installed-pct mono ${pctv === 100 ? 'gold' : ''}`}>{pctv}%</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           <div className="sidebar-foot">
             <UpdateBar />
-            {lib && withStats.length > 0 && (
+            {(scan.running || scan.error) && (
               <div className={`scan ${scan.running ? 'running' : ''}`}>
-                {scan.running ? (
+                {scan.running && (
                   <>
                     <div className="scan-text">
                       <span>{t('scan.running')}</span>
@@ -129,22 +164,15 @@ export function App() {
                       <i style={{ width: `${scan.total ? (scan.done / scan.total) * 100 : 0}%` }} />
                     </div>
                   </>
-                ) : (
+                )}
+                {scan.error && !scan.running && (
                   <>
-                    <div className="scan-text">
-                      <span>{rest > 0 ? t('scan.checked', { n: checked, total: withStats.length }) : t('scan.allDone')}</span>
-                    </div>
-                    <div className="bar thin">
-                      <i style={{ width: `${(checked / withStats.length) * 100}%` }} />
-                    </div>
-                    {rest > 0 && (
-                      <button className="scan-btn" onClick={checkRest}>
-                        {t('scan.rest')} <span className="mono dim">{rest}</span>
-                      </button>
-                    )}
+                    <p className="scan-error">{t(errorKey(scan.error))}</p>
+                    <button className="scan-btn" onClick={() => api.startScan(false)}>
+                      {t('common.retry')}
+                    </button>
                   </>
                 )}
-                {scan.error && !scan.running && <p className="scan-error">{t(errorKey(scan.error))}</p>}
               </div>
             )}
             <button className="me" onClick={() => go({ name: 'settings' })}>

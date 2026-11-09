@@ -56,6 +56,7 @@ export default {
     if (req.headers.get('origin')) return json({ error: 'FORBIDDEN' }, 403);
     if (url.pathname === '/health') return json({ ok: true });
     if (url.pathname === '/guide') return guide(url, req, env, ctx);
+    if (url.pathname === '/progress') return progress(url, req, env);
     if (!url.pathname.startsWith('/steam/')) return json({ error: 'NOT_FOUND' }, 404);
 
     const path = url.pathname.slice('/steam'.length);
@@ -169,4 +170,48 @@ async function guide(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Respon
     const detail = e instanceof Error ? e.message.slice(0, 200) : '';
     return json({ error: 'AI_ERROR', detail }, 502);
   }
+}
+
+// ---- postęp osiągnięć wielu gier naraz ----
+// Jedno zapytanie do Steam zamiast jednego na grę: 300 gier = 3 zapytania, a nie 300.
+
+const MAX_APPIDS = 100;
+
+async function progress(url: URL, req: Request, env: Env): Promise<Response> {
+  const steamid = url.searchParams.get('steamid') ?? '';
+  const appids = (url.searchParams.get('appids') ?? '').split(',').filter(Boolean);
+  if (!STEAMID.test(steamid) || appids.length === 0 || appids.length > MAX_APPIDS || appids.some((a) => !/^\d{1,10}$/.test(a))) {
+    return json({ error: 'BAD_REQUEST' }, 400);
+  }
+  if (!env.STEAM_KEY) return json({ error: 'SERVICE_DOWN' }, 503);
+  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (env.LIMITER && !(await env.LIMITER.limit({ key: ip })).success) return json({ error: 'TOO_FAST' }, 429);
+
+  // GetTopAchievementsForGames działa na klucz Web API (GetAchievementsProgress wymaga zalogowanego gracza)
+  const target = new URL('https://api.steampowered.com/IPlayerService/GetTopAchievementsForGames/v1/');
+  target.searchParams.set('key', env.STEAM_KEY);
+  target.searchParams.set('steamid', steamid);
+  target.searchParams.set('language', 'english');
+  target.searchParams.set('max_achievements', '10000');
+  appids.forEach((a, i) => target.searchParams.set(`appids[${i}]`, a));
+  let res: Response;
+  try {
+    res = await fetch(target.toString());
+  } catch {
+    return json({ error: 'UPSTREAM' }, 502);
+  }
+  const body = await res.text();
+  if (res.status === 429) return json({ error: 'DAILY_LIMIT' }, 429);
+  if ((res.status === 401 || res.status === 403) && !body.trimStart().startsWith('{')) return json({ error: 'SERVICE_DOWN' }, 503);
+  if (res.status >= 500 || !res.ok) return json({ error: 'UPSTREAM' }, 502);
+  // Do aplikacji idą same liczby — listy osiągnięć (setki KB) nie są tu potrzebne
+  let games: any[] = [];
+  try {
+    games = JSON.parse(body)?.response?.games ?? [];
+  } catch {
+    return json({ error: 'UPSTREAM' }, 502);
+  }
+  return json({
+    games: games.map((g) => ({ appid: g.appid, total: g.total_achievements ?? 0, achieved: (g.achievements ?? []).length })),
+  });
 }

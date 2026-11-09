@@ -4,6 +4,7 @@ export const pl: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Biblioteka',
   'nav.settings': 'Ustawienia',
+  'nav.installed': 'Zainstalowane',
 
   'connect.lang': 'Język',
   'connect.eyebrow': 'Bez logowania i bez kluczy',
@@ -47,7 +48,7 @@ export const pl: Dict = {
   'library.refresh': 'Odśwież',
   'library.saved': 'Lista gier z {d}',
   'library.unchecked': 'otwórz, by sprawdzić',
-  'scan.running': 'Skanuję osiągnięcia',
+  'scan.running': 'Pobieram postęp',
   'scan.checked': 'Sprawdzone {n} z {total}',
   'scan.rest': 'Sprawdź resztę',
   'scan.confirm': 'Sprawdzić {n} gier naraz? Zajmie to ok. {m} min i zużyje część dziennego limitu. Możesz też otwierać gry pojedynczo.',

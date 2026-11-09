@@ -165,14 +165,30 @@ export const steamProvider: Provider = {
     );
   },
 
-  async achievementSummary(appid, steamid, key) {
-    try {
-      const list = await playerAchievements(appid, steamid, key);
-      return { total: list.length, achieved: list.filter((a) => a.achieved === 1).length };
-    } catch (e) {
-      if (e instanceof AppError && e.code === 'NO_STATS') return { total: 0, achieved: 0 };
-      throw e;
+  async progress(appids, steamid, key) {
+    // Własny klucz: wprost do Steam. Bez klucza: przez nasz serwer, który zwraca same liczby.
+    if (key) {
+      const url = new URL(`${API}/IPlayerService/GetTopAchievementsForGames/v1/`);
+      url.searchParams.set('key', key);
+      url.searchParams.set('steamid', steamid);
+      url.searchParams.set('language', 'english');
+      url.searchParams.set('max_achievements', '10000');
+      appids.forEach((a, i) => url.searchParams.set(`appids[${i}]`, String(a)));
+      const { body } = await send(url, false);
+      return (body?.response?.games ?? []).map((g: any) => ({
+        appid: g.appid,
+        total: g.total_achievements ?? 0,
+        achieved: (g.achievements ?? []).length,
+      }));
     }
+    const proxy = proxyUrl();
+    if (!proxy) throw new AppError('INVALID_KEY');
+    const url = new URL(`${proxy}/progress`);
+    url.searchParams.set('steamid', steamid);
+    url.searchParams.set('appids', appids.join(','));
+    const { body } = await send(url, true);
+    if (!Array.isArray(body?.games)) throw new AppError('SERVICE_DOWN');
+    return body.games;
   },
 
   async gameDetail(appid, name, steamid, key, lang) {

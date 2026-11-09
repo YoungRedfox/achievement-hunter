@@ -4,6 +4,7 @@ export const ptBR: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Biblioteca',
   'nav.settings': 'Configurações',
+  'nav.installed': 'Instalados',
 
   'connect.lang': 'Idioma',
   'connect.eyebrow': 'Sem login, sem chaves',
@@ -47,7 +48,7 @@ export const ptBR: Dict = {
   'library.refresh': 'Atualizar',
   'library.saved': 'Lista de jogos de {d}',
   'library.unchecked': 'abra para verificar',
-  'scan.running': 'Verificando conquistas',
+  'scan.running': 'Carregando progresso',
   'scan.checked': '{n} de {total} verificados',
   'scan.rest': 'Verificar o resto',
   'scan.confirm': 'Verificar {n} jogos de uma vez? Leva cerca de {m} min e usa parte do limite diário. Você também pode abrir os jogos um por um.',

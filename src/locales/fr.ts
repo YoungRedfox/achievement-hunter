@@ -4,6 +4,7 @@ export const fr: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Bibliothèque',
   'nav.settings': 'Paramètres',
+  'nav.installed': 'Installés',
 
   'connect.lang': 'Langue',
   'connect.eyebrow': 'Sans connexion, sans clé',
@@ -47,7 +48,7 @@ export const fr: Dict = {
   'library.refresh': 'Actualiser',
   'library.saved': 'Liste des jeux du {d}',
   'library.unchecked': 'ouvrir pour vérifier',
-  'scan.running': 'Vérification des succès',
+  'scan.running': 'Chargement de la progression',
   'scan.checked': '{n} sur {total} vérifiés',
   'scan.rest': 'Vérifier le reste',
   'scan.confirm': 'Vérifier {n} jeux d’un coup ? Cela prend environ {m} min et utilise une partie de la limite quotidienne. Tu peux aussi ouvrir les jeux un par un.',

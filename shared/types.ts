@@ -151,4 +151,5 @@ export interface Api {
   downloadUpdate(): Promise<void>;
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void;
   appVersion(): Promise<string>;
+  installedGames(): Promise<{ appid: number; name: string }[]>;
 }

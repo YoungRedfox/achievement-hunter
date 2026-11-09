@@ -3,6 +3,7 @@ export const en = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Library',
   'nav.settings': 'Settings',
+  'nav.installed': 'Installed',
 
   'connect.lang': 'Language',
   'connect.eyebrow': 'No sign-in, no keys',
@@ -46,7 +47,7 @@ export const en = {
   'library.refresh': 'Refresh',
   'library.saved': 'Game list from {d}',
   'library.unchecked': 'open to check',
-  'scan.running': 'Scanning achievements',
+  'scan.running': 'Loading progress',
   'scan.checked': 'Checked {n} of {total}',
   'scan.rest': 'Check the rest',
   'scan.confirm': 'Check {n} games at once? It takes about {m} min and uses part of the daily limit. You can also open games one by one.',

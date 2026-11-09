@@ -8,6 +8,7 @@ import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide } from '../shar
 import type { SteamKey } from './provider';
 import { proxyGuide, proxyUrl, steamProvider } from './steam';
 import { isLang } from '../shared/langs';
+import { installedGames } from './steam-local';
 import { Store } from './store';
 import { downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
@@ -84,54 +85,55 @@ function setSummary(detail: GameDetail) {
   send('scan:summary', detail.appid, summary);
 }
 
-// ---- sprawdzanie wszystkich gier: tylko na wyraźne żądanie, bo zużywa dzienny limit ----
+// ---- postęp wszystkich gier od razu, paczkami po 100 (300 gier = 3 zapytania) ----
 
-let scanning = false;
+const BATCH = 100;
+const PROGRESS_TTL = 12 * 3600_000;
+let syncing = false;
 
-async function runScan(force: boolean) {
-  if (scanning) return;
+async function syncProgress(force: boolean) {
+  if (syncing || !store.data.profile) return;
   const key = steamKey();
-  const steamid = store.data.profile!.steamid;
-  // Tylko gry jeszcze niesprawdzone (force = wszystkie); ostatnio grane najpierw
+  const steamid = store.data.profile.steamid;
+  const now = Date.now();
+  // Tylko to, co trzeba: brak danych, stare dane albo gra była grana od ostatniego pobrania
   const todo = (store.data.games?.list ?? [])
-    .filter((g) => g.hasStats && (force || !store.data.summaries[g.appid]))
+    .filter((g) => {
+      if (!g.hasStats) return false;
+      const s = store.data.summaries[g.appid];
+      return force || !s || now - s.fetchedAt > PROGRESS_TTL || g.lastPlayed * 1000 > s.fetchedAt;
+    })
     .sort((a, b) => b.lastPlayed - a.lastPlayed);
+  if (todo.length === 0) return;
 
-  scanning = true;
+  syncing = true;
   const progress: ScanProgress = { done: 0, total: todo.length, running: true };
   send('scan:progress', progress);
-  let i = 0;
-  const worker = async () => {
-    while (i < todo.length && !progress.error) {
-      const g = todo[i++];
+  try {
+    for (let i = 0; i < todo.length && !progress.error; ) {
+      const chunk = todo.slice(i, i + BATCH);
       try {
-        const s = await provider.achievementSummary(g.appid, steamid, key);
-        const summary = { ...s, fetchedAt: Date.now() };
-        store.data.summaries[g.appid] = summary;
+        const results = await provider.progress(chunk.map((g) => g.appid), steamid, key);
+        const fetchedAt = Date.now();
+        for (const r of results) {
+          const summary = { total: r.total, achieved: r.achieved, fetchedAt };
+          store.data.summaries[r.appid] = summary;
+          send('scan:summary', r.appid, summary);
+        }
         store.save();
-        send('scan:summary', g.appid, summary);
+        i += chunk.length;
+        progress.done = Math.min(i, todo.length);
+        send('scan:progress', progress);
       } catch (e) {
         if (e instanceof AppError && e.code === 'RATE_LIMIT') {
-          // Serwer kazał zwolnić — odczekaj i spróbuj tej samej gry jeszcze raz
-          i--;
           await sleep(15_000);
           continue;
         }
-        // Limit dzienny albo awaria serwera: przerywamy, żeby nie palić zapytań na próżno
-        const code = softCode(e) ?? (e instanceof AppError && e.code === 'PRIVATE_GAMES' ? e.code : null);
-        if (code && code !== 'NETWORK') progress.error = code;
-        else console.warn(`scan ${g.appid}:`, e instanceof Error ? e.message : e);
+        progress.error = softCode(e) ?? (e instanceof AppError ? e.code : 'UNKNOWN');
       }
-      progress.done++;
-      send('scan:progress', progress);
-      // ~80 zapytań/min — poniżej limitu serwera na jedno IP
-      await sleep(750);
     }
-  };
-  try {
-    await worker();
   } finally {
-    scanning = false;
+    syncing = false;
     send('scan:progress', { ...progress, running: false });
     store.flush();
   }
@@ -216,11 +218,16 @@ function registerIpc() {
   ipcMain.handle('library:get', (_e, refresh: boolean) =>
     toResult(async () => {
       const g = store.data.games;
-      if (!refresh && g && Date.now() - g.fetchedAt < LIBRARY_TTL) return library();
+      const sync = () => setTimeout(() => syncProgress(false).catch((e) => console.error('sync failed', e)), 300);
+      if (!refresh && g && Date.now() - g.fetchedAt < LIBRARY_TTL) {
+        sync();
+        return library();
+      }
       try {
         const list = await provider.ownedGames(store.data.profile!.steamid, steamKey());
         store.data.games = { fetchedAt: Date.now(), list };
         store.save();
+        sync();
         return library();
       } catch (e) {
         const code = softCode(e);
@@ -232,7 +239,7 @@ function registerIpc() {
 
   ipcMain.handle('library:scan', (_e, force: boolean) =>
     toResult(async () => {
-      runScan(force).catch((e) => console.error('scan failed', e));
+      syncProgress(force).catch((e) => console.error('sync failed', e));
       return null;
     }),
   );
@@ -293,6 +300,10 @@ function registerIpc() {
 
   ipcMain.handle('open:external', (_e, url: string) => openSafe(url));
   ipcMain.handle('app:version', () => app.getVersion());
+  // Demo: kilka gier z listy demo udaje zainstalowane
+  ipcMain.handle('installed:get', () =>
+    isDemo ? [1145360, 367520, 413150, 504230].map((appid) => ({ appid, name: '' })) : installedGames().catch(() => []),
+  );
   ipcMain.handle('update:status', () => getUpdateStatus());
   ipcMain.handle('update:download', () => downloadUpdate(isDemo && process.env.AH_DEMO_UPDATE === '1').catch((e) => console.warn(e)));
 }

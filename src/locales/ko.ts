@@ -4,6 +4,7 @@ export const ko: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': '라이브러리',
   'nav.settings': '설정',
+  'nav.installed': '설치됨',
 
   'connect.lang': '언어',
   'connect.eyebrow': '로그인도, 키도 필요 없음',
@@ -47,7 +48,7 @@ export const ko: Dict = {
   'library.refresh': '새로고침',
   'library.saved': '게임 목록: {d}',
   'library.unchecked': '열어서 확인',
-  'scan.running': '도전 과제 확인 중',
+  'scan.running': '진행 상황 불러오는 중',
   'scan.checked': '{total}개 중 {n}개 확인',
   'scan.rest': '나머지 확인',
   'scan.confirm': '게임 {n}개를 한 번에 확인할까요? 약 {m}분 걸리며 하루 한도의 일부를 사용합니다. 게임을 하나씩 열어도 됩니다.',
