@@ -1,6 +1,7 @@
 import type { Achievement, GameDetail, Lang } from '../shared/types';
 import { langInfo } from '../shared/langs';
 import { AppError, sleep } from './errors';
+import { unwrap } from './xbox-unwrap';
 
 // Xbox przez OpenXBL (xbl.io) — nieoficjalne API do Xbox Live.
 // Każdy gracz używa WŁASNEGO klucza (regulamin OpenXBL zabrania dzielenia kluczy), więc zapytania idą
@@ -53,11 +54,15 @@ async function call(path: string, key: string, lang: Lang = 'en'): Promise<any> 
       continue;
     }
     if (!res.ok) throw new AppError('XBOX_ERROR', `HTTP ${res.status}`);
-    return res.json().catch(() => {
+    const raw: any = await res.json().catch(() => {
       throw new AppError('XBOX_ERROR', 'bad json');
+    });
+    return unwrap(raw, (code, message) => {
+      throw new AppError(code, message);
     });
   }
 }
+
 
 const setting = (settings: any[], id: string) => settings?.find((s: any) => s.id === id)?.value ?? '';
 
@@ -99,7 +104,8 @@ const icon = (a: any) =>
 
 /** Osiągnięcia jednej gry — w tym samym kształcie co Steam, żeby widok gry był wspólny. */
 export async function xboxGameDetail(key: string, xuid: string, game: XboxGame, lang: Lang): Promise<GameDetail> {
-  const body = await call(`/achievements/player/${xuid}/title/${game.titleId}`, key, lang);
+  // Uwaga: wariant z "/title/" w ścieżce zwraca pustą listę — działa tylko ten (sprawdzone 10.11.2026)
+  const body = await call(`/achievements/player/${xuid}/${game.titleId}`, key, lang);
   const list: any[] = body?.achievements ?? [];
   const achievements: Achievement[] = list.map((a) => {
     const achieved = a.progressState === 'Achieved';
