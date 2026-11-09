@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '../shared/guide-core';
 import type { AchSummary, GameDetail, Guide, Lang, OwnedGame, Profile } from '../shared/types';
+import { DEFAULT_LANG, isLang } from '../shared/langs';
 import { AppError } from './errors';
 
 export interface StoreData {
@@ -62,7 +63,8 @@ export class Store {
     this.secretsFile = path.join(dir, 'secrets.json');
     const defaults: StoreData = {
       version: 1,
-      lang: app.getLocale().toLowerCase().startsWith('pl') ? 'pl' : 'en',
+      // Domyślnie angielski — język wybiera się na ekranie łączenia
+      lang: DEFAULT_LANG,
       aiProvider: 'gemini',
       aiModel: '',
       profile: null,
@@ -74,6 +76,7 @@ export class Store {
     // Starszy, nieszyfrowany plik przenosimy do zaszyfrowanego i usuwamy
     const saved = readEncrypted<Partial<StoreData>>(this.file) ?? readJson<Partial<StoreData>>(legacy) ?? {};
     this.data = { ...defaults, ...saved };
+    if (!isLang(this.data.lang)) this.data.lang = DEFAULT_LANG;
     if (fs.existsSync(legacy)) {
       this.flush();
       fs.rmSync(legacy, { force: true });

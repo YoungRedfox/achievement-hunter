@@ -1461,3 +1461,37 @@ select option {
 .update.installing .update-text {
   margin-bottom: 0;
 }
+
+/* ---- wybór języka ---- */
+
+.lang-field {
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.lang-field .field-label {
+  grid-column: 2;
+  grid-row: 1;
+}
+.lang-field .lang-select {
+  grid-column: 3;
+  grid-row: 1;
+}
+.lang-select {
+  min-width: 190px;
+}
+
+/* Znaki CJK i cyrylica: system dobiera czcionkę, gdy Plex/Fraunces jej nie mają */
+:root {
+  --sans: 'IBM Plex Sans', 'Segoe UI', 'Microsoft YaHei UI', 'Yu Gothic UI', 'Malgun Gothic', system-ui, sans-serif;
+  --serif: 'Fraunces Variable', Georgia, 'Microsoft YaHei UI', 'Yu Mincho', 'Malgun Gothic', serif;
+}
+:lang(zh-CN) .eyebrow,
+:lang(ja) .eyebrow,
+:lang(ko) .eyebrow,
+:lang(zh-CN) .small-caps,
+:lang(ja) .small-caps,
+:lang(ko) .small-caps {
+  letter-spacing: 0.04em;
+}

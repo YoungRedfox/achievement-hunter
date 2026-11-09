@@ -1,6 +1,7 @@
 // Serwer pośredniczący (Cloudflare Worker): trzyma klucz Steam Web API, żeby użytkownik wklejał tylko link do profilu.
 // Przepuszcza wyłącznie odczyty z białej listy, dokleja klucz i nigdy go nie zwraca.
 // Generuje też poradniki AI naszym kluczem i zapisuje je per osiągnięcie (bez żadnych danych o graczu).
+import { isLang, langInfo } from '../../shared/langs.ts';
 import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide, type AiProvider } from '../../shared/guide-core.ts';
 
 type Limiter = { limit(opts: { key: string }): Promise<{ success: boolean }> };
@@ -111,7 +112,7 @@ async function guide(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Respon
   const appid = url.searchParams.get('appid') ?? '';
   const apiname = url.searchParams.get('apiname') ?? '';
   const lang = url.searchParams.get('lang') ?? '';
-  if (!/^\d{1,10}$/.test(appid) || !/^[\w.:-]{1,128}$/.test(apiname) || (lang !== 'pl' && lang !== 'en')) {
+  if (!/^\d{1,10}$/.test(appid) || !/^[\w.:-]{1,128}$/.test(apiname) || !isLang(lang)) {
     return json({ error: 'BAD_REQUEST' }, 400);
   }
 
@@ -127,7 +128,7 @@ async function guide(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Respon
   if (!apiKey) return json({ error: 'SERVICE_DOWN' }, 503);
 
   // Nazwę i opis osiągnięcia bierzemy ze Steam, nie od klienta — nikt nie podrzuci fałszywego poradnika innym
-  const language = lang === 'pl' ? 'polish' : 'english';
+  const language = langInfo(lang).steam;
   let ach: any;
   let gameName = `App ${appid}`;
   try {

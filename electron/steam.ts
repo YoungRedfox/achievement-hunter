@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import { DEFAULT_PROXY_URL } from '../shared/config';
+import { langInfo } from '../shared/langs';
 import type { Achievement, Guide, Lang, OwnedGame, Profile } from '../shared/types';
 import { AppError, sleep } from './errors';
 import { isSteamKey, parseProfileInput } from './profile-input';
@@ -9,7 +10,7 @@ import type { Provider, SteamKey } from './provider';
 // Zapytania wymagające klucza idą przez nasz serwer (server/) albo, jeśli użytkownik woli, z jego własnym kluczem.
 const API = 'https://api.steampowered.com';
 const ICONS = 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps';
-const steamLang = (l: Lang) => (l === 'pl' ? 'polish' : 'english');
+const steamLang = (l: Lang) => langInfo(l).steam;
 
 // Nadpisanie adresu tylko w wersji deweloperskiej — zainstalowana aplikacja zawsze mówi z naszym serwerem
 export const proxyUrl = () => ((!app.isPackaged && process.env.AH_PROXY_URL) || DEFAULT_PROXY_URL).replace(/\/+$/, '');

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Lang, Settings } from '../../shared/types';
+import type { Settings } from '../../shared/types';
+import { LangSelect } from './LangSelect';
 import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
 import { Spinner } from './ui';
@@ -188,13 +189,7 @@ export function SettingsView({
           <p>{t('settings.lang.hint')}</p>
         </div>
         <div className="setting-body">
-          <div className="tabs">
-            {(['pl', 'en'] as Lang[]).map((l) => (
-              <button key={l} className={settings.lang === l ? 'on' : ''} onClick={() => save('lang', { lang: l })}>
-                {l === 'pl' ? 'Polski' : 'English'}
-              </button>
-            ))}
-          </div>
+          <LangSelect value={settings.lang} onChange={(lang) => save('lang', { lang })} />
         </div>
       </section>
 

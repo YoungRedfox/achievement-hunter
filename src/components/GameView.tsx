@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Achievement, ErrorCode, GameDetail, LibraryGame } from '../../shared/types';
 import { errorKey, useLang, useT } from '../i18n';
+import { langInfo } from '../../shared/langs';
 import { api, fmtDate, hours, rarity } from '../lib';
 import { Guide } from './Guide';
 import { Icon, Ring, SteamArt } from './ui';
@@ -195,7 +196,7 @@ function AchievementRow({
           )}
           {a.achieved ? (
             <span className="unlocked mono dim">
-              {t('game.unlocked', { d: new Date(a.unlockTime * 1000).toLocaleDateString(lang === 'pl' ? 'pl-PL' : 'en-GB') })}
+              {t('game.unlocked', { d: new Date(a.unlockTime * 1000).toLocaleDateString(langInfo(lang).locale) })}
             </span>
           ) : (
             <button className={`howto ${open ? 'on' : ''}`} onClick={onToggle} aria-expanded={open}>

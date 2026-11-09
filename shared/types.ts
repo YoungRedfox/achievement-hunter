@@ -1,6 +1,7 @@
 // Typy wspólne dla procesu głównego, preloadu i interfejsu
 
-export type Lang = 'pl' | 'en';
+export type { Lang } from './langs';
+import type { Lang } from './langs';
 
 export interface Profile {
   steamid: string;

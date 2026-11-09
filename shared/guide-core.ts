@@ -1,5 +1,6 @@
 // Generowanie poradnika — wspólne dla aplikacji (własny klucz gracza) i serwera (nasz klucz).
 // Tylko fetch, bez Node i bez Electrona, żeby działało w obu miejscach.
+import { langInfo } from './langs.ts';
 import type { Guide, Lang } from './types';
 
 export type AiProvider = 'gemini' | 'openai';
@@ -28,7 +29,7 @@ export class GuideError extends Error {
 const FIELDS = `{"summary": string, "steps": string[], "tips": string[], "missable": boolean, "difficulty": "easy"|"medium"|"hard"|"very_hard", "estimatedMinutes": integer|null, "confidence": "high"|"medium"|"low", "sources": [{"title": string, "url": string}]}`;
 
 function instructions(lang: Lang) {
-  const language = lang === 'pl' ? 'Polish' : 'English';
+  const language = langInfo(lang).ai;
   return [
     'You are a meticulous achievement hunter writing a short, practical guide for one Steam achievement.',
     'Search the web for how players actually unlock it (Steam guides, wikis, TrueAchievements, forums).',

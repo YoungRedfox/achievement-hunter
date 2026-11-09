@@ -7,6 +7,7 @@ import { AppError, sleep, toResult } from './errors';
 import { AI_PROVIDERS, DEFAULT_MODELS, GuideError, generateGuide } from '../shared/guide-core';
 import type { SteamKey } from './provider';
 import { proxyGuide, proxyUrl, steamProvider } from './steam';
+import { isLang } from '../shared/langs';
 import { Store } from './store';
 import { downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
@@ -162,7 +163,7 @@ function registerIpc() {
 
   ipcMain.handle('settings:update', (_e, patch: SettingsPatch) =>
     toResult(async () => {
-      if (patch.lang) store.data.lang = patch.lang;
+      if (isLang(patch.lang)) store.data.lang = patch.lang;
       if (patch.aiProvider && AI_PROVIDERS.includes(patch.aiProvider) && patch.aiProvider !== store.data.aiProvider) {
         // Inny dostawca = inny klucz i inny model
         store.data.aiProvider = patch.aiProvider;
@@ -367,6 +368,8 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionCheckHandler(() => false);
   store = new Store();
   // Demo do zrzutów ekranu: od razu "połączony" profil
+  // Demo: język z AH_DEMO_LANG — do zrzutów ekranu w innych językach
+  if (isDemo && isLang(process.env.AH_DEMO_LANG)) store.data.lang = process.env.AH_DEMO_LANG;
   if (isDemo && process.env.AH_DEMO_CONNECTED === '1' && !store.data.profile) {
     store.data.profile = await demoProvider.resolveProfile('', null);
     store.data.games = { fetchedAt: Date.now(), list: await demoProvider.ownedGames('', null) };

@@ -30,7 +30,11 @@ export function App() {
   // Domyślnie wszystkie gry — gracz sam wybiera, którą sprawdzić
   const [filter, setFilter] = useState<Filter>('all');
 
-  const t = useMemo(() => makeT(settings?.lang ?? 'pl'), [settings?.lang]);
+  const t = useMemo(() => makeT(settings?.lang ?? 'en'), [settings?.lang]);
+  // Atrybut lang wybiera właściwe kroje dla chińskiego, japońskiego i koreańskiego
+  useEffect(() => {
+    document.documentElement.lang = settings?.lang ?? 'en';
+  }, [settings?.lang]);
 
   useEffect(() => {
     api.getSettings().then((r) => r.ok && setSettings(r.data));
@@ -71,6 +75,8 @@ export function App() {
     return (
       <LangContext.Provider value={ctx}>
         <Connect
+          lang={settings.lang}
+          onLang={(lang) => api.updateSettings({ lang }).then((r) => r.ok && setSettings(r.data))}
           demo={settings.demo}
           needsKey={!settings.proxyAvailable}
           onConnected={(profile) => setSettings({ ...settings, profile })}

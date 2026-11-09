@@ -1,3 +1,4 @@
+import { langInfo, type Lang } from '../shared/langs';
 import type { Api, LibraryGame } from '../shared/types';
 
 declare global {
@@ -43,9 +44,9 @@ export function searchLinks(gameName: string, achName: string, appid: number) {
   };
 }
 
-export function fmtDate(ts: number, lang: 'pl' | 'en') {
+export function fmtDate(ts: number, lang: Lang) {
   const d = new Date(ts);
-  const loc = lang === 'pl' ? 'pl-PL' : 'en-GB';
+  const loc = langInfo(lang).locale;
   const today = new Date().toDateString() === d.toDateString();
   // Dzisiejsze dane pokazujemy samą godziną — tak szybciej widać, że są świeże
   return today

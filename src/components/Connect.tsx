@@ -1,10 +1,24 @@
 import { useState, type FormEvent } from 'react';
+import type { Lang } from '../../shared/langs';
 import type { Profile } from '../../shared/types';
+import { LangSelect } from './LangSelect';
 import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
 import { Mark, Spinner } from './ui';
 
-export function Connect({ onConnected, demo, needsKey }: { onConnected: (p: Profile) => void; demo: boolean; needsKey: boolean }) {
+export function Connect({
+  onConnected,
+  demo,
+  needsKey,
+  lang,
+  onLang,
+}: {
+  onConnected: (p: Profile) => void;
+  demo: boolean;
+  needsKey: boolean;
+  lang: Lang;
+  onLang: (l: Lang) => void;
+}) {
   const t = useT();
   const [profile, setProfile] = useState('');
   const [key, setKey] = useState('');
@@ -54,6 +68,11 @@ export function Connect({ onConnected, demo, needsKey }: { onConnected: (p: Prof
       </section>
 
       <form className="connect-form" onSubmit={submit}>
+        <label className="field lang-field">
+          <span className="field-label">{t('connect.lang')}</span>
+          <LangSelect value={lang} onChange={onLang} />
+        </label>
+
         <label className="field">
           <span className="field-num">01</span>
           <span className="field-label">{t('connect.step1')}</span>
