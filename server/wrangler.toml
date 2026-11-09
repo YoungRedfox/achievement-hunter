@@ -10,3 +10,6 @@ simple = { limit = 90, period = 60 }
 
 # Klucz Steam NIE trafia do repo. Ustawiasz go raz:
 #   npx wrangler secret put STEAM_KEY
+
+workers_dev = true
+preview_urls = false
