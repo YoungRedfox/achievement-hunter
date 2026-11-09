@@ -44,6 +44,17 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-release-'));
 sh(`gh run download ${runId} --repo ${CODE_REPO} --name installer --dir "${dir}"`);
 const files = fs.readdirSync(dir).map((f) => `"${path.join(dir, f)}"`).join(' ');
 
+// Notatki: docs/release-notes/<wersja>.md jeśli istnieje, inaczej krótki angielski tekst
+const notesSrc = path.join('docs', 'release-notes', `${version}.md`);
+const notes = path.join(dir, 'NOTES.md');
+fs.writeFileSync(
+  notes,
+  fs.existsSync(notesSrc)
+    ? fs.readFileSync(notesSrc, 'utf8')
+    : 'A fresh update is here. If you already have Achievement Hunter, just click **Download and update** in the app.',
+);
+fs.renameSync(notes, path.join(os.tmpdir(), `ah-notes-${version}.md`));
+
 console.log('→ Publikuję wydanie…');
-sh(`gh release create ${tag} ${files} --repo ${RELEASE_REPO} --title "Achievement Hunter ${version}" --notes "Nowa wersja. Aplikacja zaktualizuje się sama — kliknij \\"Pobierz i zaktualizuj\\"."`);
+sh(`gh release create ${tag} ${files} --repo ${RELEASE_REPO} --title "Achievement Hunter ${version}" --notes-file "${path.join(os.tmpdir(), `ah-notes-${version}.md`)}"`);
 console.log(`✓ Gotowe: https://github.com/${RELEASE_REPO}/releases/tag/${tag}`);
