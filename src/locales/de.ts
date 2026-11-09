@@ -4,6 +4,7 @@ export const de: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Bibliothek',
   'nav.settings': 'Einstellungen',
+  'nav.steamProfile': 'Steam-Profil öffnen',
   'nav.installed': 'Installiert',
 
   'connect.lang': 'Sprache',
@@ -154,6 +155,11 @@ export const de: Dict = {
   'about.thirdParty': 'Open-Source-Lizenzen',
   'about.steamTerms': 'Steam-Web-API-Bedingungen',
   'about.notice': 'Steam und das Steam-Logo sind Marken der Valve Corporation. Achievement Hunter steht in keiner Verbindung zu Valve. Daten stammen aus der Steam Web API. Guides werden von KI geschrieben und können Fehler enthalten.',
+  'whatsNew.eyebrow': 'Neu',
+  'whatsNew.title': 'Neu in {v}',
+  'whatsNew.ok': 'Alles klar',
+  'whatsNew.empty': 'Fehlerbehebungen und kleine Verbesserungen.',
+  'about.whatsNew': 'Was ist neu',
   'common.retry': 'Erneut versuchen',
   'common.demo': 'Demomodus',
 

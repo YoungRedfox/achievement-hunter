@@ -3,6 +3,7 @@ export const en = {
   'app.name': 'Achievement Hunter',
   'nav.library': 'Library',
   'nav.settings': 'Settings',
+  'nav.steamProfile': 'Open Steam profile',
   'nav.installed': 'Installed',
 
   'connect.lang': 'Language',
@@ -153,6 +154,11 @@ export const en = {
   'about.thirdParty': 'Open-source licenses',
   'about.steamTerms': 'Steam Web API terms',
   'about.notice': 'Steam and the Steam logo are trademarks of Valve Corporation. Achievement Hunter is not affiliated with Valve. Data provided by the Steam Web API. Guides are written by AI and may contain mistakes.',
+  'whatsNew.eyebrow': "What's new",
+  'whatsNew.title': "What's new in {v}",
+  'whatsNew.ok': 'Got it',
+  'whatsNew.empty': 'Bug fixes and small improvements.',
+  'about.whatsNew': "What's new",
   'common.retry': 'Try again',
   'common.demo': 'Demo mode',
 

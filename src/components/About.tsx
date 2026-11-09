@@ -3,6 +3,7 @@ import type { UpdateCheck } from '../../shared/types';
 import { useT } from '../i18n';
 import { api } from '../lib';
 import { Icon, Mark, Spinner } from './ui';
+import { WhatsNew } from './WhatsNew';
 
 const REPO = 'https://github.com/YoungRedfox/achievement-hunter';
 const doc = (file: string) => `${REPO}/blob/main/${file}`;
@@ -13,6 +14,7 @@ export function About() {
   const [version, setVersion] = useState('');
   const [check, setCheck] = useState<UpdateCheck | null>(null);
   const [checking, setChecking] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
   useEffect(() => {
     api.appVersion().then(setVersion);
@@ -47,6 +49,9 @@ export function About() {
             <p className="strong">{t('app.name')}</p>
             <p className="mono dim">{t('about.version', { v: version })}</p>
           </div>
+          <button className="ghost" onClick={() => setShowNotes(true)}>
+            {t('about.whatsNew')}
+          </button>
           <button className="ghost" onClick={runCheck} disabled={checking}>
             {checking ? <Spinner /> : <Icon.Refresh />} {t('about.check')}
           </button>
@@ -72,6 +77,7 @@ export function About() {
         </ul>
 
         <p className="about-notice">{t('about.notice')}</p>
+        {showNotes && version && <WhatsNew from={null} current={version} onClose={() => setShowNotes(false)} />}
       </div>
     </section>
   );

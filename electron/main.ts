@@ -307,6 +307,23 @@ function registerIpc() {
   ipcMain.handle('update:status', () => getUpdateStatus());
   ipcMain.handle('update:download', () => downloadUpdate().catch((e) => console.warn(e)));
   ipcMain.handle('update:check', () => checkForUpdates());
+  ipcMain.handle('whatsnew:get', () => {
+    const current = app.getVersion();
+    const seen = store.data.lastSeenVersion;
+    // Demo: AH_DEMO_WHATSNEW=1 udaje świeżą aktualizację
+    if (isDemo && process.env.AH_DEMO_WHATSNEW === '1') return { show: true, from: '0.3.0', current };
+    // Nowa instalacja (brak profilu i zapisu) = bez okna; aktualizacja = okno z notatkami
+    if (!seen && !store.data.profile) {
+      store.data.lastSeenVersion = current;
+      store.save();
+      return { show: false, from: null, current };
+    }
+    return { show: seen !== current, from: seen ?? null, current };
+  });
+  ipcMain.handle('whatsnew:seen', () => {
+    store.data.lastSeenVersion = app.getVersion();
+    store.flush();
+  });
 }
 
 function createWindow() {

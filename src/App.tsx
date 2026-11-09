@@ -5,6 +5,7 @@ import { GameView } from './components/GameView';
 import { Library, type Filter } from './components/Library';
 import { SettingsView } from './components/SettingsView';
 import { UpdateBar } from './components/UpdateBar';
+import { WhatsNew } from './components/WhatsNew';
 import { Icon, Mark } from './components/ui';
 import { LangContext, errorKey, makeT } from './i18n';
 import { api } from './lib';
@@ -30,6 +31,7 @@ export function App() {
   // Domyślnie wszystkie gry — gracz sam wybiera, którą sprawdzić
   const [filter, setFilter] = useState<Filter>('all');
   const [installed, setInstalled] = useState<{ appid: number; name: string }[]>([]);
+  const [whatsNew, setWhatsNew] = useState<{ from: string | null; current: string } | null>(null);
 
   const t = useMemo(() => makeT(settings?.lang ?? 'en'), [settings?.lang]);
   // Atrybut lang wybiera właściwe kroje dla chińskiego, japońskiego i koreańskiego
@@ -75,6 +77,7 @@ export function App() {
   useEffect(() => {
     if (!connected) return;
     void loadLibrary(false);
+    api.whatsNew().then((w) => w.show && setWhatsNew({ from: w.from, current: w.current }));
     api.installedGames().then(setInstalled);
   }, [connected, loadLibrary]);
 
@@ -116,9 +119,6 @@ export function App() {
           <nav>
             <button className={route.name === 'library' ? 'on' : ''} onClick={() => go({ name: 'library' })}>
               <Icon.Library /> {t('nav.library')}
-            </button>
-            <button className={route.name === 'settings' ? 'on' : ''} onClick={() => go({ name: 'settings' })}>
-              <Icon.Settings /> {t('nav.settings')}
             </button>
           </nav>
 
@@ -175,11 +175,17 @@ export function App() {
                 )}
               </div>
             )}
-            <button className="me" onClick={() => go({ name: 'settings' })}>
+            {/* Awatar i nick prowadzą do profilu Steam; Ustawienia mają własny przycisk pod spodem */}
+            <button className="me" onClick={() => api.openExternal(p.profileUrl)} title={t('nav.steamProfile')}>
               {p.avatar ? <img src={p.avatar} alt="" /> : <div className="avatar-fallback">{p.name.slice(0, 1)}</div>}
               <span>{p.name}</span>
-              {settings.demo && <span className="demo-tag">demo</span>}
+              {settings.demo ? <span className="demo-tag">demo</span> : <Icon.External />}
             </button>
+            <nav className="nav-bottom">
+              <button className={route.name === 'settings' ? 'on' : ''} onClick={() => go({ name: 'settings' })}>
+                <Icon.Settings /> {t('nav.settings')}
+              </button>
+            </nav>
           </div>
         </aside>
 
@@ -235,6 +241,16 @@ export function App() {
           )}
         </main>
       </div>
+      {whatsNew && (
+        <WhatsNew
+          from={whatsNew.from}
+          current={whatsNew.current}
+          onClose={() => {
+            setWhatsNew(null);
+            void api.whatsNewSeen();
+          }}
+        />
+      )}
     </LangContext.Provider>
   );
 }

@@ -4,6 +4,7 @@ export const zhCN: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': '游戏库',
   'nav.settings': '设置',
+  'nav.steamProfile': '打开 Steam 个人资料',
   'nav.installed': '已安装',
 
   'connect.lang': '语言',
@@ -154,6 +155,11 @@ export const zhCN: Dict = {
   'about.thirdParty': '开源许可',
   'about.steamTerms': 'Steam Web API 条款',
   'about.notice': 'Steam 及 Steam 标志是 Valve Corporation 的商标。Achievement Hunter 与 Valve 无关。数据由 Steam Web API 提供。指南由 AI 撰写，可能存在错误。',
+  'whatsNew.eyebrow': '更新内容',
+  'whatsNew.title': '{v} 更新内容',
+  'whatsNew.ok': '知道了',
+  'whatsNew.empty': '错误修复和小幅改进。',
+  'about.whatsNew': '更新内容',
   'common.retry': '重试',
   'common.demo': '演示模式',
 

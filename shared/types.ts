@@ -140,6 +140,14 @@ export interface UpdateCheck {
   latest: string;
 }
 
+export interface WhatsNew {
+  /** pokazać okno po starcie */
+  show: boolean;
+  /** wersja sprzed aktualizacji (null = nieznana) */
+  from: string | null;
+  current: string;
+}
+
 export interface Api {
   getSettings(): Promise<Result<Settings>>;
   updateSettings(patch: SettingsPatch): Promise<Result<Settings>>;
@@ -156,6 +164,8 @@ export interface Api {
   getUpdateStatus(): Promise<UpdateStatus>;
   downloadUpdate(): Promise<void>;
   checkForUpdates(): Promise<UpdateCheck>;
+  whatsNew(): Promise<WhatsNew>;
+  whatsNewSeen(): Promise<void>;
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void;
   appVersion(): Promise<string>;
   installedGames(): Promise<{ appid: number; name: string }[]>;

@@ -4,6 +4,7 @@ export const ko: Dict = {
   'app.name': 'Achievement Hunter',
   'nav.library': '라이브러리',
   'nav.settings': '설정',
+  'nav.steamProfile': 'Steam 프로필 열기',
   'nav.installed': '설치됨',
 
   'connect.lang': '언어',
@@ -154,6 +155,11 @@ export const ko: Dict = {
   'about.thirdParty': '오픈 소스 라이선스',
   'about.steamTerms': 'Steam Web API 약관',
   'about.notice': 'Steam 및 Steam 로고는 Valve Corporation의 상표입니다. Achievement Hunter는 Valve와 관련이 없습니다. 데이터는 Steam Web API에서 제공됩니다. 가이드는 AI가 작성하며 오류가 있을 수 있습니다.',
+  'whatsNew.eyebrow': '새로운 기능',
+  'whatsNew.title': '{v}의 새로운 기능',
+  'whatsNew.ok': '확인',
+  'whatsNew.empty': '버그 수정 및 소소한 개선.',
+  'about.whatsNew': '새로운 기능',
   'common.retry': '다시 시도',
   'common.demo': '데모 모드',
 

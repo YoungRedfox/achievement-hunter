@@ -50,7 +50,10 @@ const notes = path.join(dir, 'NOTES.md');
 fs.writeFileSync(
   notes,
   fs.existsSync(notesSrc)
-    ? fs.readFileSync(notesSrc, 'utf8')
+    ? fs.readFileSync(notesSrc, 'utf8').trimEnd() + '
+
+Already installed? Click **Download and update** in the sidebar.
+'
     : 'A fresh update is here. If you already have Achievement Hunter, just click **Download and update** in the app.',
 );
 fs.renameSync(notes, path.join(os.tmpdir(), `ah-notes-${version}.md`));

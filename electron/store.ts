@@ -13,6 +13,8 @@ export interface StoreData {
   /** pusty = domyślny model dostawcy */
   aiModel: string;
   profile: Profile | null;
+  /** wersja, której notatki gracz już widział — po aktualizacji pokazujemy „Co nowego” */
+  lastSeenVersion?: string;
   games: { fetchedAt: number; list: OwnedGame[] } | null;
   summaries: Record<string, AchSummary>;
   /** pełne listy osiągnięć otwieranych gier — kolejne otwarcie nie pobiera ich od nowa */
