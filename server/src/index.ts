@@ -160,9 +160,12 @@ async function guide(url: URL, req: Request, env: Env, ctx: Ctx): Promise<Respon
   } catch (e) {
     const code = e instanceof GuideError ? e.code : 'AI_ERROR';
     // Wyczerpany darmowy limit AI na dziś
-    if (code === 'AI_LIMIT') return json({ error: 'AI_LIMIT' }, 429);
+    if (code === 'AI_BUSY') return json({ error: 'AI_BUSY' }, 503);
+    if (code === 'AI_LIMIT') return json({ error: 'AI_LIMIT', detail: e instanceof Error ? e.message.slice(0, 300) : '' }, 429);
     // Nasz klucz AI odrzucony = awaria usługi, nie wina gracza
     if (code === 'AI_INVALID_KEY') return json({ error: 'SERVICE_DOWN' }, 503);
-    return json({ error: 'AI_ERROR' }, 502);
+    // Krótki opis od dostawcy (bez klucza) — ułatwia diagnozę, gdy np. model zostanie wycofany
+    const detail = e instanceof Error ? e.message.slice(0, 200) : '';
+    return json({ error: 'AI_ERROR', detail }, 502);
   }
 }

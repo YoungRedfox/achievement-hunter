@@ -4,7 +4,7 @@ import type { Guide, Lang } from './types';
 
 export type AiProvider = 'gemini' | 'openai';
 export const AI_PROVIDERS: AiProvider[] = ['gemini', 'openai'];
-export const DEFAULT_MODELS: Record<AiProvider, string> = { gemini: 'gemini-2.5-flash', openai: 'gpt-5-mini' };
+export const DEFAULT_MODELS: Record<AiProvider, string> = { gemini: 'gemini-flash-latest', openai: 'gpt-5-mini' };
 
 export interface GuideInput {
   appid: number;
@@ -15,7 +15,7 @@ export interface GuideInput {
   lang: Lang;
 }
 
-export type GuideErrorCode = 'AI_INVALID_KEY' | 'AI_LIMIT' | 'AI_ERROR' | 'NETWORK';
+export type GuideErrorCode = 'AI_INVALID_KEY' | 'AI_LIMIT' | 'AI_BUSY' | 'AI_ERROR' | 'NETWORK';
 // Bez skrótu "public code" w konstruktorze — Node (testy) uruchamia ten plik bez kompilacji
 export class GuideError extends Error {
   code: GuideErrorCode;
@@ -58,9 +58,11 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(60_000),
     });
-  } catch {
+  } catch (e) {
+    // Przeciążony model potrafi wisieć minutami — dla gracza to to samo co "zajęte"
+    if (e instanceof Error && e.name === 'TimeoutError') throw new GuideError('AI_BUSY', 'timeout');
     throw new GuideError('NETWORK');
   }
   const data: any = await res.json().catch(() => null);
@@ -71,12 +73,26 @@ async function post(url: string, headers: Record<string, string>, body: unknown)
 
 async function gemini(apiKey: string, model: string, input: GuideInput) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-  const { res, data } = await post(url, { 'x-goog-api-key': apiKey }, {
+  const body = {
     systemInstruction: { parts: [{ text: instructions(input.lang) }] },
     contents: [{ role: 'user', parts: [{ text: userText(input) }] }],
-    tools: [{ google_search: {} }],
-  });
+  };
+  let { res, data } = await post(url, { 'x-goog-api-key': apiKey }, { ...body, tools: [{ google_search: {} }] });
+  // Darmowy próg często nie obejmuje wyszukiwania Google — wtedy próba bez niego (słabsze źródła, ale działa)
+  if (res.status === 429) {
+    ({ res, data } = await post(url, { 'x-goog-api-key': apiKey }, {
+      ...body,
+      // Krótkie "myślenie" — inaczej model potrafi liczyć ponad 2 minuty
+      generationConfig: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'low' } },
+    }));
+  }
+  // Przeciążenie po stronie Google (503) — jedna ponowna próba po chwili
+  if (res.status === 503) {
+    await new Promise((r) => setTimeout(r, 2500));
+    ({ res, data } = await post(url, { 'x-goog-api-key': apiKey }, body));
+  }
   const msg = data?.error?.message ?? `HTTP ${res.status}`;
+  if (res.status === 503 || res.status === 500 || /high demand|overloaded|UNAVAILABLE/i.test(msg)) throw new GuideError('AI_BUSY', msg);
   if (res.status === 429) throw new GuideError('AI_LIMIT', msg);
   if (res.status === 401 || res.status === 403 || /API key/i.test(msg)) {
     if (!res.ok) throw new GuideError('AI_INVALID_KEY', msg);

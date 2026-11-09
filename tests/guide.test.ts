@@ -68,7 +68,7 @@ test('guide maps AI quota to AI_LIMIT and rejects unknown achievements', async (
   fakeSteamAndAi(() => Response.json({ error: { message: 'quota' } }, { status: 429 }));
   const lim = await worker.fetch(new Request('https://w.dev/guide?appid=620&apiname=ACH_1&lang=pl'), env, ctx);
   assert.equal(lim.status, 429);
-  assert.deepEqual(await lim.json(), { error: 'AI_LIMIT' });
+  assert.equal((await lim.json()).error, 'AI_LIMIT');
   const missing = await worker.fetch(new Request('https://w.dev/guide?appid=620&apiname=NOPE&lang=pl'), env, ctx);
   assert.equal(missing.status, 404);
   const bad = await worker.fetch(new Request('https://w.dev/guide?appid=x&apiname=ACH_1&lang=pl'), env, ctx);

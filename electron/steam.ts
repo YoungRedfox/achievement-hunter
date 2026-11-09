@@ -99,7 +99,7 @@ export async function proxyGuide(appid: number, apiname: string, lang: Lang): Pr
   const body: any = await res.json().catch(() => null);
   if (res.ok && body?.steps) return body as Guide;
   if (res.status === 429) throw new AppError(body?.error === 'TOO_FAST' ? 'RATE_LIMIT' : 'AI_LIMIT');
-  if (res.status === 503) throw new AppError('SERVICE_DOWN');
+  if (res.status === 503) throw new AppError(body?.error === 'AI_BUSY' ? 'AI_BUSY' : 'SERVICE_DOWN');
   throw new AppError('AI_ERROR', body?.error ?? `HTTP ${res.status}`);
 }
 

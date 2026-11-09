@@ -114,6 +114,7 @@ export type ErrorCode =
   | 'NO_AI_KEY'
   | 'AI_INVALID_KEY'
   | 'AI_LIMIT'
+  | 'AI_BUSY'
   | 'AI_ERROR'
   | 'UNKNOWN';
 

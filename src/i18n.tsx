@@ -151,6 +151,7 @@ const pl = {
   'error.NO_AI_KEY': 'Brak klucza AI.',
   'error.AI_INVALID_KEY': 'Dostawca AI odrzucił klucz. Sprawdź go w Ustawieniach.',
   'error.AI_LIMIT': 'Dzisiejszy limit poradników AI się wyczerpał.',
+  'error.AI_BUSY': 'AI jest teraz przeciążone. Spróbuj za kilka minut.',
   'error.AI_ERROR': 'AI nie odpowiedziało poprawnie. Spróbuj ponownie.',
   'error.UNKNOWN': 'Coś poszło nie tak.',
 };
@@ -307,6 +308,7 @@ const en: Record<Key, string> = {
   'error.NO_AI_KEY': 'No AI key.',
   'error.AI_INVALID_KEY': 'The AI provider rejected the key. Check it in Settings.',
   'error.AI_LIMIT': "Today's AI guide limit is used up.",
+  'error.AI_BUSY': 'The AI is overloaded right now. Try again in a few minutes.',
   'error.AI_ERROR': 'The AI did not respond correctly. Try again.',
   'error.UNKNOWN': 'Something went wrong.',
 };
