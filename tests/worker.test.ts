@@ -48,6 +48,16 @@ test('our rejected key is a service outage, private profile is passed through', 
   assert.match(await res.text(), /not public/);
 });
 
+test('blocks browser origins and per-IP floods', async () => {
+  mockSteam(200, '{}');
+  const browser = new Request(`https://w.dev/steam/ISteamUser/ResolveVanityURL/v1/?vanityurl=abc`, { headers: { origin: 'https://evil.example' } });
+  assert.equal((await worker.fetch(browser, env, ctx)).status, 403);
+  const limited = { ...env, LIMITER: { limit: async () => ({ success: false }) } };
+  const res = await worker.fetch(new Request(`https://w.dev/steam/ISteamUser/ResolveVanityURL/v1/?vanityurl=abc`), limited, ctx);
+  assert.equal(res.status, 429);
+  assert.deepEqual(await res.json(), { error: 'TOO_FAST' });
+});
+
 test('never leaks the key in responses', async () => {
   mockSteam(200, '{"ok":1}');
   const res = await get(`/steam/ISteamUser/ResolveVanityURL/v1/?vanityurl=robinwalker`);

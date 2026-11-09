@@ -3,6 +3,8 @@
 
 export interface Env {
   STEAM_KEY: string;
+  /** Cloudflare Rate Limiting — limit zapytań na jeden adres IP */
+  LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
 interface Ctx {
@@ -34,6 +36,8 @@ export default {
   async fetch(req: Request, env: Env, ctx: Ctx): Promise<Response> {
     const url = new URL(req.url);
     if (req.method !== 'GET') return json({ error: 'METHOD' }, 405);
+    // Aplikacja woła z procesu Node (bez nagłówka Origin). Strony WWW nie mogą korzystać z naszego klucza.
+    if (req.headers.get('origin')) return json({ error: 'FORBIDDEN' }, 403);
     if (url.pathname === '/health') return json({ ok: true });
     if (!url.pathname.startsWith('/steam/')) return json({ error: 'NOT_FOUND' }, 404);
 
@@ -44,6 +48,10 @@ export default {
     const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
     if (params.some(([k, v]) => !validParam(k, v))) return json({ error: 'BAD_REQUEST' }, 400);
     if (!env.STEAM_KEY) return json({ error: 'SERVICE_DOWN' }, 503);
+
+    // Jeden użytkownik nie może wypalić dziennego limitu wszystkim
+    const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
+    if (env.LIMITER && !(await env.LIMITER.limit({ key: ip })).success) return json({ error: 'TOO_FAST' }, 429);
 
     // Pamięć podręczna oszczędza dzienny limit klucza (działa na własnej domenie, na *.workers.dev nie)
     const query = new URLSearchParams(params).toString();

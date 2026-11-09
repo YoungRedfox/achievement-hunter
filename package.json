@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Brakujące osiągnięcia Steam i sposoby, jak je zdobyć — bez logowania do Steam.",
   "author": "YoungRedfox",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -25,7 +25,8 @@
     "files": [
       "dist/**",
       "dist-electron/**",
-      "package.json"
+      "package.json",
+      "!**/*.map"
     ],
     "win": {
       "target": "nsis",
@@ -39,7 +40,17 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Achievement Hunter",
       "artifactName": "AchievementHunter-Setup-${version}.${ext}"
-    }
+    },
+    "asar": true,
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "copyright": "Copyright © 2026 YoungRedfox. Wszelkie prawa zastrzeżone."
   },
   "devDependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",

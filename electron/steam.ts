@@ -1,3 +1,4 @@
+import { app } from 'electron';
 import { DEFAULT_PROXY_URL } from '../shared/config';
 import type { Achievement, Lang, OwnedGame, Profile } from '../shared/types';
 import { AppError, sleep } from './errors';
@@ -10,7 +11,8 @@ const API = 'https://api.steampowered.com';
 const ICONS = 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps';
 const steamLang = (l: Lang) => (l === 'pl' ? 'polish' : 'english');
 
-export const proxyUrl = () => (process.env.AH_PROXY_URL || DEFAULT_PROXY_URL).replace(/\/+$/, '');
+// Nadpisanie adresu tylko w wersji deweloperskiej — zainstalowana aplikacja zawsze mówi z naszym serwerem
+export const proxyUrl = () => ((!app.isPackaged && process.env.AH_PROXY_URL) || DEFAULT_PROXY_URL).replace(/\/+$/, '');
 
 interface Raw {
   status: number;
@@ -39,7 +41,7 @@ async function send(url: URL, viaProxy: boolean): Promise<Raw> {
 
     if (viaProxy) {
       // Serwer sam ponawia i cache'uje — tu nie męczymy limitu powtórkami 429
-      if (res.status === 429) throw new AppError('DAILY_LIMIT');
+      if (res.status === 429) throw new AppError(body?.error === 'TOO_FAST' ? 'RATE_LIMIT' : 'DAILY_LIMIT');
       if (res.status === 503) throw new AppError('SERVICE_DOWN');
       if (res.status >= 500 || (body === null && res.status !== 200)) {
         if (attempt < 1) {

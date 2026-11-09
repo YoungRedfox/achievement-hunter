@@ -41,3 +41,12 @@ AH_DEMO=1 AH_DEMO_CONNECTED=1 AH_SHOT=shots/library.png node_modules/electron/di
 
 - Podpis kodu (certyfikat Authenticode) — bez niego Windows SmartScreen ostrzega przy instalacji.
 - Automatyczne aktualizacje (electron-updater + GitHub Releases).
+
+## Zabezpieczenia
+
+- Klucz Steam tylko na serwerze (sekret Cloudflare); nigdy w exe ani w repo.
+- Serwer: biała lista zapytań i parametrów, limit 90 zapytań/min na IP, blokada wywołań ze stron WWW.
+- Dane i klucze na dysku szyfrowane przez Windows DPAPI (`data.bin`, `secrets.json`).
+- Electron: sandbox, contextIsolation, CSP, brak DevTools i menu w wersji wydanej, odmowa wszystkich uprawnień.
+- Electron fuses: wyłączony tryb Node (`ELECTRON_RUN_AS_NODE`), `NODE_OPTIONS`, `--inspect`; sprawdzanie integralności `app.asar`.
+- Licencja: wszelkie prawa zastrzeżone (`LICENSE`).

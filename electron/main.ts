@@ -1,15 +1,17 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ErrorCode, GameDetail, Library, ScanProgress, Settings, SettingsPatch } from '../shared/types';
 import { demoGuide, demoProvider } from './demo';
-import { AppError, toResult } from './errors';
+import { AppError, sleep, toResult } from './errors';
 import { generateGuide } from './guide';
 import type { SteamKey } from './provider';
 import { proxyUrl, steamProvider } from './steam';
 import { DEFAULT_MODEL, Store } from './store';
 
-const isDemo = process.env.AH_DEMO === '1';
+// Przełączniki deweloperskie (demo, zrzuty) nie działają w zainstalowanej aplikacji
+const dev = !app.isPackaged;
+const isDemo = dev && process.env.AH_DEMO === '1';
 const provider = isDemo ? demoProvider : steamProvider;
 // Lista gier odświeża się sama raz na dobę; osiągnięcia gry tylko gdy w nią grałeś od ostatniego pobrania
 const LIBRARY_TTL = 24 * 3600_000;
@@ -106,17 +108,25 @@ async function runScan(force: boolean) {
         store.save();
         send('scan:summary', g.appid, summary);
       } catch (e) {
-        // Limit albo awaria serwera: przerywamy, żeby nie palić zapytań na próżno
+        if (e instanceof AppError && e.code === 'RATE_LIMIT') {
+          // Serwer kazał zwolnić — odczekaj i spróbuj tej samej gry jeszcze raz
+          i--;
+          await sleep(15_000);
+          continue;
+        }
+        // Limit dzienny albo awaria serwera: przerywamy, żeby nie palić zapytań na próżno
         const code = softCode(e) ?? (e instanceof AppError && e.code === 'PRIVATE_GAMES' ? e.code : null);
         if (code && code !== 'NETWORK') progress.error = code;
         else console.warn(`scan ${g.appid}:`, e instanceof Error ? e.message : e);
       }
       progress.done++;
       send('scan:progress', progress);
+      // ~80 zapytań/min — poniżej limitu serwera na jedno IP
+      await sleep(750);
     }
   };
   try {
-    await Promise.all(Array.from({ length: Math.min(4, todo.length) }, worker));
+    await worker();
   } finally {
     scanning = false;
     send('scan:progress', { ...progress, running: false });
@@ -252,8 +262,8 @@ function registerIpc() {
 }
 
 function createWindow() {
-  const devUrl = process.env.VITE_DEV_SERVER_URL;
-  const shot = process.env.AH_SHOT;
+  const devUrl = dev ? process.env.VITE_DEV_SERVER_URL : undefined;
+  const shot = dev ? process.env.AH_SHOT : undefined;
   win = new BrowserWindow({
     width: 1320,
     height: 860,
@@ -269,6 +279,9 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      webSecurity: true,
+      // Bez narzędzi deweloperskich w wersji dla ludzi
+      devTools: dev,
       spellcheck: false,
     },
   });
@@ -292,7 +305,7 @@ function createWindow() {
     }
   });
 
-  const hash = process.env.AH_SHOT_HASH ?? '';
+  const hash = (dev && process.env.AH_SHOT_HASH) || '';
   if (devUrl) void win.loadURL(devUrl + hash);
   else void win.loadFile(path.join(__dirname, '../dist/index.html'), { hash: hash.replace(/^#/, '') });
 
@@ -313,6 +326,10 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(null);
+  // Aplikacja nie potrzebuje kamery, mikrofonu, powiadomień itd. — odmawiamy wszystkiego
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
   store = new Store();
   // Demo do zrzutów ekranu: od razu "połączony" profil
   if (isDemo && process.env.AH_DEMO_CONNECTED === '1' && !store.data.profile) {

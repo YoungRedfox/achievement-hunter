@@ -29,10 +29,22 @@ function readJson<T>(file: string): T | null {
 }
 
 // Zapis przez plik tymczasowy — przerwany zapis nie zniszczy danych
-function writeJson(file: string, data: unknown) {
+function writeAtomic(file: string, data: string | Buffer) {
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data));
+  fs.writeFileSync(tmp, data);
   fs.renameSync(tmp, file);
+}
+function writeJson(file: string, data: unknown) {
+  writeAtomic(file, JSON.stringify(data));
+}
+
+// Cały zapis aplikacji szyfrowany przez Windows (DPAPI): odczytasz go tylko na tym koncie Windows
+function readEncrypted<T>(file: string): T | null {
+  try {
+    return JSON.parse(safeStorage.decryptString(fs.readFileSync(file))) as T;
+  } catch {
+    return null;
+  }
 }
 
 export class Store {
@@ -44,7 +56,8 @@ export class Store {
 
   constructor(dir = app.getPath('userData')) {
     fs.mkdirSync(dir, { recursive: true });
-    this.file = path.join(dir, 'data.json');
+    this.file = path.join(dir, 'data.bin');
+    const legacy = path.join(dir, 'data.json');
     this.secretsFile = path.join(dir, 'secrets.json');
     const defaults: StoreData = {
       version: 1,
@@ -56,7 +69,13 @@ export class Store {
       details: {},
       guides: {},
     };
-    this.data = { ...defaults, ...(readJson<Partial<StoreData>>(this.file) ?? {}) };
+    // Starszy, nieszyfrowany plik przenosimy do zaszyfrowanego i usuwamy
+    const saved = readEncrypted<Partial<StoreData>>(this.file) ?? readJson<Partial<StoreData>>(legacy) ?? {};
+    this.data = { ...defaults, ...saved };
+    if (fs.existsSync(legacy)) {
+      this.flush();
+      fs.rmSync(legacy, { force: true });
+    }
     this.secrets = readJson(this.secretsFile) ?? {};
   }
 
@@ -68,7 +87,8 @@ export class Store {
   flush() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    writeJson(this.file, this.data);
+    if (!safeStorage.isEncryptionAvailable()) return; // bez szyfrowania nie zapisujemy nic na dysk
+    writeAtomic(this.file, safeStorage.encryptString(JSON.stringify(this.data)));
   }
 
   // Klucze szyfrowane przez Windows DPAPI — plik skopiowany na inny komputer jest bezużyteczny

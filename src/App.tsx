@@ -84,7 +84,7 @@ export function App() {
   const rest = withStats.length - checked;
 
   function checkRest() {
-    const minutes = Math.max(1, Math.round(rest / 150));
+    const minutes = Math.max(1, Math.round(rest / 75));
     if (confirm(t('scan.confirm', { n: rest, m: minutes }))) void api.startScan(false);
   }
 
