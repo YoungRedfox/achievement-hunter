@@ -20,6 +20,7 @@ const api: Api = {
   },
   getUpdateStatus: () => ipcRenderer.invoke('update:status'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   installedGames: () => ipcRenderer.invoke('installed:get'),
   onUpdateStatus: (cb) => {

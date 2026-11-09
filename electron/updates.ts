@@ -1,12 +1,17 @@
+import { app } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import type { UpdateStatus } from '../shared/types';
+import type { UpdateCheck, UpdateStatus } from '../shared/types';
 
-// Aktualizacje: sprawdzamy przy starcie i co 6 h. Gracz klika jeden przycisk —
-// pobieramy instalator, a po pobraniu aplikacja sama się zamyka, instaluje nową wersję i uruchamia ponownie.
-const CHECK_EVERY = 6 * 3600_000;
+// Aktualizacje: przy starcie, co godzinę i przy powrocie do okna (najwyżej raz na 30 min).
+// Wcześniej było co 6 h — wydanie opublikowane chwilę po starcie aplikacji czekało do wieczora.
+const CHECK_EVERY = 3600_000;
+const FOCUS_GAP = 30 * 60_000;
 
 let status: UpdateStatus = { state: 'idle' };
 let notify: (s: UpdateStatus) => void = () => {};
+let enabled = false;
+let demo = false;
+let lastCheck = 0;
 
 function set(s: UpdateStatus) {
   status = s;
@@ -17,18 +22,22 @@ export function getUpdateStatus() {
   return status;
 }
 
-export function setupUpdates(send: (s: UpdateStatus) => void, enabled: boolean, demo: boolean) {
+export function setupUpdates(send: (s: UpdateStatus) => void, isEnabled: boolean, isDemo: boolean) {
   notify = send;
+  enabled = isEnabled;
+  demo = isDemo;
   if (demo) {
     // Tryb demo: udajemy dostępną aktualizację, żeby zobaczyć pasek
-    setTimeout(() => set({ state: 'available', version: '0.2.0' }), 1500);
+    setTimeout(() => set({ state: 'available', version: '0.5.0' }), 1500);
     return;
   }
   if (!enabled) return;
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('update-available', (info) => set({ state: 'available', version: info.version }));
+  autoUpdater.on('update-available', (info) => {
+    if (status.state === 'idle' || status.state === 'error') set({ state: 'available', version: info.version });
+  });
   autoUpdater.on('download-progress', (p) => set({ ...status, state: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded', (info) => {
     set({ state: 'installing', version: info.version });
@@ -37,16 +46,33 @@ export function setupUpdates(send: (s: UpdateStatus) => void, enabled: boolean, 
   });
   autoUpdater.on('error', (e) => {
     console.warn('update error', e?.message);
-    // Błąd w trakcie pobierania pokazujemy; cichy błąd sprawdzania (np. brak sieci) — nie
     if (status.state === 'downloading') set({ ...status, state: 'error' });
   });
 
-  const check = () => autoUpdater.checkForUpdates().catch(() => undefined);
-  setTimeout(check, 5_000);
-  setInterval(check, CHECK_EVERY);
+  setTimeout(() => void checkForUpdates(), 5_000);
+  setInterval(() => void checkForUpdates(), CHECK_EVERY);
+  app.on('browser-window-focus', () => {
+    if (Date.now() - lastCheck > FOCUS_GAP) void checkForUpdates();
+  });
 }
 
-export async function downloadUpdate(demo: boolean) {
+/** Sprawdzenie na żądanie (przycisk w Ustawieniach) albo z harmonogramu. */
+export async function checkForUpdates(): Promise<UpdateCheck> {
+  const current = app.getVersion();
+  if (demo) return { result: 'available', current, latest: '0.5.0' };
+  if (!enabled) return { result: 'latest', current, latest: current };
+  lastCheck = Date.now();
+  try {
+    const r = await autoUpdater.checkForUpdates();
+    const latest = r?.updateInfo?.version ?? current;
+    return { result: r?.isUpdateAvailable ? 'available' : 'latest', current, latest };
+  } catch (e) {
+    console.warn('update check failed', e instanceof Error ? e.message : e);
+    return { result: 'error', current, latest: current };
+  }
+}
+
+export async function downloadUpdate() {
   if (status.state !== 'available' && status.state !== 'error') return;
   if (demo) {
     for (let p = 0; p <= 100; p += 20) {

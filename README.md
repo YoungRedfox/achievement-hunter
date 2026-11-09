@@ -61,6 +61,10 @@ Running your own fork? Point `DEFAULT_PROXY_URL` in `shared/config.ts` at your o
 
 Security notes for the curious: sandboxed renderer, strict CSP, no DevTools in releases, Electron fuses locked down (no RunAsNode, ASAR integrity checks), and a server that only accepts a short allow-list of Steam endpoints with per-IP rate limits. Releases are built on GitHub Actions; see [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
 
+## Legal
+
+[Privacy policy](PRIVACY.md) · [Terms of use](TERMS.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Steam Web API terms](https://steamcommunity.com/dev/apiterms)
+
 ## License
 
 [GPL-3.0](LICENSE) © 2026 YoungRedfox. Use it, learn from it, change it. If you ship a modified version, keep it open source too.

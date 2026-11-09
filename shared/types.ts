@@ -134,6 +134,12 @@ export interface UpdateStatus {
   percent?: number;
 }
 
+export interface UpdateCheck {
+  result: 'latest' | 'available' | 'error';
+  current: string;
+  latest: string;
+}
+
 export interface Api {
   getSettings(): Promise<Result<Settings>>;
   updateSettings(patch: SettingsPatch): Promise<Result<Settings>>;
@@ -149,6 +155,7 @@ export interface Api {
   onSummary(cb: (appid: number, s: AchSummary) => void): () => void;
   getUpdateStatus(): Promise<UpdateStatus>;
   downloadUpdate(): Promise<void>;
+  checkForUpdates(): Promise<UpdateCheck>;
   onUpdateStatus(cb: (s: UpdateStatus) => void): () => void;
   appVersion(): Promise<string>;
   installedGames(): Promise<{ appid: number; name: string }[]>;

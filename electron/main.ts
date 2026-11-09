@@ -10,7 +10,7 @@ import { proxyGuide, proxyUrl, steamProvider } from './steam';
 import { isLang } from '../shared/langs';
 import { installedGames } from './steam-local';
 import { Store } from './store';
-import { downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
+import { checkForUpdates, downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
 // Przełączniki deweloperskie (demo, zrzuty) nie działają w zainstalowanej aplikacji
 const dev = !app.isPackaged;
@@ -305,7 +305,8 @@ function registerIpc() {
     isDemo ? [1145360, 367520, 413150, 504230].map((appid) => ({ appid, name: '' })) : installedGames().catch(() => []),
   );
   ipcMain.handle('update:status', () => getUpdateStatus());
-  ipcMain.handle('update:download', () => downloadUpdate(isDemo && process.env.AH_DEMO_UPDATE === '1').catch((e) => console.warn(e)));
+  ipcMain.handle('update:download', () => downloadUpdate().catch((e) => console.warn(e)));
+  ipcMain.handle('update:check', () => checkForUpdates());
 }
 
 function createWindow() {
@@ -361,6 +362,11 @@ function createWindow() {
     win.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
         try {
+          // AH_SHOT_SCROLL=1: zrzut dolnej części strony (np. Ustawienia → O aplikacji)
+          if (process.env.AH_SHOT_SCROLL) {
+            await win!.webContents.executeJavaScript("document.querySelector('.main')?.scrollTo(0, 1e6)");
+            await new Promise((r) => setTimeout(r, 400));
+          }
           const img = await win!.webContents.capturePage();
           fs.writeFileSync(shot, img.toPNG());
         } catch (e) {

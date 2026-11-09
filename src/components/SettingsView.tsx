@@ -3,6 +3,7 @@ import type { Settings } from '../../shared/types';
 import { LangSelect } from './LangSelect';
 import { errorKey, useT } from '../i18n';
 import { api } from '../lib';
+import { About } from './About';
 import { Spinner } from './ui';
 
 const AI_NAMES = { gemini: 'Google Gemini', openai: 'OpenAI' } as const;
@@ -211,6 +212,8 @@ export function SettingsView({
           {note('data')}
         </div>
       </section>
+
+      <About />
     </div>
   );
 }
