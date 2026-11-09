@@ -1,7 +1,7 @@
 {
   "name": "achievement-hunter",
   "productName": "Achievement Hunter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Brakujące osiągnięcia Steam i sposoby, jak je zdobyć — bez logowania do Steam.",
   "author": "YoungRedfox",
   "license": "SEE LICENSE IN LICENSE",
