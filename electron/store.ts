@@ -19,6 +19,8 @@ export interface StoreData {
   /** Xbox (OpenXBL): konto, gry z postępem i otwarte szczegóły */
   xbox?: { profile: XboxProfile; games: { fetchedAt: number; list: XboxGame[] } | null } | null;
   xboxDetails?: Record<string, GameDetail>;
+  /** wersja aplikacji, która ostatnio pobrała listę Xbox */
+  xboxListVersion?: string;
   games: { fetchedAt: number; list: OwnedGame[] } | null;
   summaries: Record<string, AchSummary>;
   /** pełne listy osiągnięć otwieranych gier — kolejne otwarcie nie pobiera ich od nowa */

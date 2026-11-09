@@ -191,11 +191,14 @@ function xboxKey(): string {
 async function refreshXbox(force: boolean) {
   if (!store.data.xbox?.profile || !store.getSecret('xboxKey')) return;
   const cached = store.data.xbox.games;
-  if (!force && cached && Date.now() - cached.fetchedAt < XBOX_TTL) return;
+  // Po aktualizacji aplikacji lista Xbox pobiera się od nowa — poprawki odczytu działają od razu, bez klikania ↻
+  const sameVersion = store.data.xboxListVersion === app.getVersion();
+  if (!force && cached && sameVersion && Date.now() - cached.fetchedAt < XBOX_TTL) return;
   const key = xboxKey();
   const list = await xboxGames(key);
   await fillXboxTotals(key, list);
   store.data.xbox.games = { fetchedAt: Date.now(), list };
+  store.data.xboxListVersion = app.getVersion();
   store.save();
 }
 
