@@ -9,7 +9,7 @@ import type { SteamKey } from './provider';
 import { proxyGuide, proxyGuideText, proxyUrl, steamProvider } from './steam';
 import { isLang } from '../shared/langs';
 import { installedGames } from './steam-local';
-import { xboxGameDetail, xboxGames, xboxProfile } from './xbox';
+import { type XboxGame, xboxFillTotals, xboxGameDetail, xboxGames, xboxProfile } from './xbox';
 import { Store } from './store';
 import { checkForUpdates, downloadUpdate, getUpdateStatus, setupUpdates } from './updates';
 
@@ -192,9 +192,19 @@ async function refreshXbox(force: boolean) {
   if (!store.data.xbox?.profile || !store.getSecret('xboxKey')) return;
   const cached = store.data.xbox.games;
   if (!force && cached && Date.now() - cached.fetchedAt < XBOX_TTL) return;
-  const list = await xboxGames(xboxKey());
+  const key = xboxKey();
+  const list = await xboxGames(key);
+  await fillXboxTotals(key, list);
   store.data.xbox.games = { fetchedAt: Date.now(), list };
   store.save();
+}
+
+/** Dla gier "10/0" dociąga prawdziwą liczbę osiągnięć i od razu zapisuje ich szczegóły. */
+async function fillXboxTotals(key: string, list: XboxGame[]) {
+  const xuid = store.data.xbox?.profile.xuid;
+  if (!xuid) return;
+  const details = (store.data.xboxDetails ??= {});
+  for (const d of await xboxFillTotals(key, xuid, list, store.data.lang)) details[String(d.appid)] = { ...d, appid: 0 };
 }
 
 // Tryb demo: gry Xbox udawane z listy demo (titleId = 900000000 + appid Steam)
@@ -241,6 +251,7 @@ async function loadXboxDetail(titleId: string, refresh: boolean): Promise<GameDe
   if (game.legacy) throw new AppError('XBOX_LEGACY');
   try {
     const detail = await xboxGameDetail(xboxKey(), store.data.xbox!.profile.xuid, game, lang);
+    if (detail.achievements.length === 0 && game.total > 0) throw new AppError('XBOX_LEGACY');
     details[titleId] = detail;
     // Licznik na karcie zgodny ze szczegółami
     game.achieved = detail.achievements.filter((a) => a.achieved).length;
@@ -404,8 +415,10 @@ function registerIpc() {
       const profile = await xboxProfile(key);
       const list = await xboxGames(key);
       store.setSecret('xboxKey', key);
-      store.data.xbox = { profile, games: { fetchedAt: Date.now(), list } };
+      store.data.xbox = { profile, games: null };
       store.data.xboxDetails = {};
+      await fillXboxTotals(key, list);
+      store.data.xbox.games = { fetchedAt: Date.now(), list };
       store.flush();
       return { gamertag: profile.gamertag, avatar: profile.avatar };
     }),

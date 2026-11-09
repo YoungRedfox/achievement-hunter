@@ -66,6 +66,30 @@ let titles = (await get('/achievements'))?.titles;
 if (!titles) titles = (await get('/player/titleHistory'))?.titles;
 if (!titles && user?.id) titles = (await get(`/achievements/player/${user.id}`))?.titles;
 if (!titles && user?.id) titles = (await get(`/player/titleHistory/${user.id}`))?.titles;
+// Minecraft (Bedrock) — pokazujemy, jak Xbox go opisuje, żeby filtr aplikacji go nie gubił
+for (const t of (titles ?? []).filter((x) => /minecraft/i.test(x.name ?? ''))) {
+  console.log(
+    `\nMINECRAFT: name="${t.name}" type=${t.type} devices=${(t.devices ?? []).join('/')} titleId=${t.titleId}` +
+      ` osiagniecia=${t.achievement?.currentAchievements}/${t.achievement?.totalAchievements} sourceVersion=${t.achievement?.sourceVersion}`,
+  );
+  if (user?.id) {
+    const r = await get(`/achievements/player/${user.id}/${t.titleId}`);
+    if (r?.achievements) console.log(`>>> lista osiagniec Minecraft: ${r.achievements.length}`);
+    if (!r?.achievements?.length) {
+      const old = await get(`/achievements/x360/${user.id}/title/${t.titleId}`);
+      if (old) console.log('>>> stary format (x360) zwrocil dane');
+    }
+  }
+}
+if (!(titles ?? []).some((x) => /minecraft/i.test(x.name ?? ''))) console.log('\nMINECRAFT: brak w historii gier Xbox');
+// Ile gier odrzuca filtr aplikacji i dlaczego
+const types = {};
+for (const t of titles ?? []) {
+  const k = `${t.type}|${(t.achievement?.totalAchievements ?? 0) > 0 ? 'ma osiagniecia' : 'bez osiagniec'}|sv${t.achievement?.sourceVersion}`;
+  types[k] = (types[k] ?? 0) + 1;
+}
+console.log('\nrodzaje tytulow:', JSON.stringify(types));
+
 const sample = (titles ?? []).find((t) => (t.achievement?.totalAchievements ?? 0) > 0 && !(t.devices ?? []).includes('Xbox360'));
 if (user?.id && sample) {
   console.log(`\nprzykladowa gra: type=${sample.type} devices=${(sample.devices ?? []).join('/')} zdobyte=${sample.achievement?.currentAchievements}/${sample.achievement?.totalAchievements}`);

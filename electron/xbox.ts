@@ -82,7 +82,9 @@ export async function xboxGames(key: string): Promise<XboxGame[]> {
   const body = await call('/achievements', key);
   const titles: any[] = body?.titles ?? [];
   return titles
-    .filter((t) => (t.type ?? 'Game') === 'Game' && (t.achievement?.totalAchievements ?? 0) > 0)
+    // Nowsze gry (np. Minecraft for Windows) mają w historii "10/0": łączna liczba 0, choć zdobyte są.
+    // Bierzemy więc też gry ze zdobytymi osiągnięciami; łączną liczbę uzupełnia xboxFillTotals.
+    .filter((t) => (t.type ?? 'Game') === 'Game' && ((t.achievement?.totalAchievements ?? 0) > 0 || (t.achievement?.currentAchievements ?? 0) > 0))
     .map((t) => {
       const devices: string[] = t.devices ?? [];
       return {
@@ -90,7 +92,8 @@ export async function xboxGames(key: string): Promise<XboxGame[]> {
         name: String(t.name ?? `Title ${t.titleId}`),
         image: String(t.displayImage ?? ''),
         lastPlayed: t.titleHistory?.lastTimePlayed ? Math.floor(Date.parse(t.titleHistory.lastTimePlayed) / 1000) : 0,
-        legacy: t.achievement?.sourceVersion === 1 || (devices.length > 0 && devices.every((d) => d === 'Xbox360')),
+        // Tylko prawdziwe gry z Xbox 360 mają inny format; sourceVersion 1 to też starsze gry z Xbox One/PC
+        legacy: devices.length > 0 && devices.every((d) => d === 'Xbox360'),
         total: Number(t.achievement?.totalAchievements ?? 0),
         achieved: Number(t.achievement?.currentAchievements ?? 0),
         gamerscore: Number(t.achievement?.currentGamerscore ?? 0),
@@ -125,4 +128,25 @@ export async function xboxGameDetail(key: string, xuid: string, game: XboxGame, 
     };
   });
   return { appid: 0, name: game.name, achievements, fetchedAt: Date.now(), lang };
+}
+
+/**
+ * Uzupełnia łączną liczbę osiągnięć dla gier, które w historii mają "zdobyte/0".
+ * Jedno zapytanie na taką grę (zwykle kilka), wynik zostaje jako zapisane szczegóły.
+ */
+export async function xboxFillTotals(key: string, xuid: string, games: XboxGame[], lang: Lang, limit = 25) {
+  const filled: GameDetail[] = [];
+  for (const g of games.filter((x) => x.total === 0 && x.achieved > 0 && !x.legacy).slice(0, limit)) {
+    try {
+      const d = await xboxGameDetail(key, xuid, g, lang);
+      if (d.achievements.length > 0) {
+        g.total = d.achievements.length;
+        g.achieved = d.achievements.filter((a) => a.achieved).length;
+        filled.push({ ...d, appid: Number(g.titleId) });
+      }
+    } catch (e) {
+      if (e instanceof AppError && e.code === 'XBOX_LIMIT') break;
+    }
+  }
+  return filled;
 }
